@@ -1,11 +1,18 @@
 # Tests and builds the commands on macOS, Linux and Windows on every push to
-# main and every pull request, and packs the VS Code extension.
+# main and every pull request, except one that changes only documentation,
+# and packs the VS Code extension.
 name: CI
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:

@@ -96,7 +96,8 @@ version to X.Y.Z`, tagged `vX.Y.Z`; the next commit starts the next one,
 release: the commands for macOS, Linux and Windows with the include files,
 and the VS Code extension (`.github/workflows/release.yml`); it is
 published by hand. Every push to `main` and every pull request is tested
-and built on the three systems (`.github/workflows/ci.yml`).
+and built on the three systems (`.github/workflows/ci.yml`), except one
+that changes only documentation (Markdown files and `docs/`).
 
 ## License
 
