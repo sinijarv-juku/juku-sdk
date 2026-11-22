@@ -1,0 +1,87 @@
+# A tag vX.Y.Z makes a draft release with the commands for macOS, Linux and
+# Windows and the VS Code extension (README.md, "Versions"), published by
+# hand after a look. Run by hand for a tag pushed before this workflow
+# existed.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release's tag, vX.Y.Z
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  commands:
+    strategy:
+      matrix:
+        include:
+          - { os: macos-26, platform: macos-arm64 }
+          - { os: ubuntu-latest, platform: linux-x64 }
+          - { os: windows-2025, platform: windows-x64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+      - name: The tag is Cargo.toml's version
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          test "$TAG" = "v$version" || { echo "::error::$TAG is not v$version"; exit 1; }
+      - name: Rust, as rust-toolchain.toml names it
+        run: rustup toolchain install
+      - name: Build
+        if: runner.os != 'Windows'
+        run: ./build.sh
+      - name: Build
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: build.cmd
+      - name: Pack
+        run: |
+          dir=juku-sdk-${TAG#v}-${{ matrix.platform }}
+          mkdir -p dist/$dir
+          cp target/bin/* LICENSE README.md dist/$dir/
+          cp -R include dist/$dir/
+          cd dist
+          if [ "$RUNNER_OS" = Windows ]; then 7z a -bd -tzip $dir.zip $dir >/dev/null; else tar czf $dir.tar.gz $dir; fi
+          rm -r $dir
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: commands
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Pack the VS Code extension
+        run: python3 vscode/package.py "dist/juku-${TAG#v}.vsix"
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --draft \
+              --title "juku-sdk ${TAG#v}" \
+              --notes "juku-sdk ${TAG#v}: juku-asm, juku-disk and juku-dis for each system, with the include files, and the VS Code extension (code --install-extension juku-${TAG#v}.vsix)."

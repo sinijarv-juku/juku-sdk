@@ -1,0 +1,44 @@
+# Tests and builds the commands on macOS, Linux and Windows on every push to
+# main and every pull request, and packs the VS Code extension.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, ubuntu-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust, as rust-toolchain.toml names it
+        run: rustup toolchain install
+      - name: Tests
+        run: cargo test --locked
+      - name: Build
+        if: runner.os != 'Windows'
+        run: ./build.sh && target/bin/juku-asm --version
+      - name: Build
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: build.cmd && target\bin\juku-asm.exe --version
+
+  vscode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Pack the extension
+        run: python3 vscode/package.py

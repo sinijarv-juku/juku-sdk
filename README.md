@@ -92,7 +92,11 @@ its layout may change in any release.
 
 A release is the commit that drops `-dev` from the version, `build: bump the
 version to X.Y.Z`, tagged `vX.Y.Z`; the next commit starts the next one,
-`build: start version X.Y+1.0-dev`.
+`build: start version X.Y+1.0-dev`. Pushing the tag drafts the GitHub
+release: the commands for macOS, Linux and Windows with the include files,
+and the VS Code extension (`.github/workflows/release.yml`); it is
+published by hand. Every push to `main` and every pull request is tested
+and built on the three systems (`.github/workflows/ci.yml`).
 
 ## License
 
