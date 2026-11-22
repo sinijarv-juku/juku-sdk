@@ -184,9 +184,10 @@ fn include_folders() {
     let program = assemble_with(&dir.join("src/p.asm"), &options).unwrap();
     assert_eq!(program.image, [1, 2, 3, 4, 5]);
 
-    // Without the folders, one.inc is nowhere.
-    let e = assemble(&dir.join("src/p.asm")).err().unwrap().to_string();
-    assert!(e.contains("p.asm:2: No such file or directory: ") && e.contains("src/one.inc"), "{e}");
+    // Without the folders, one.inc is nowhere. The system words the error
+    // and writes the path its own way: Windows with backslashes.
+    let e = assemble(&dir.join("src/p.asm")).err().unwrap().to_string().replace('\\', "/");
+    assert!(e.contains("p.asm:2: ") && e.contains("src/one.inc"), "{e}");
 }
 
 /// Names are case-sensitive; mnemonics, registers and directives are not.
@@ -219,11 +220,11 @@ fn errors() {
     assert_eq!(error("rept", "        rept 2\n        nop\n"), "p.asm:1: REPT without ENDM\n          rept 2");
     assert_eq!(error("empty", "; nothing\n"), "p.asm: no code");
 
-    let e = error("missing", "        include 'no.asm'\n");
-    assert!(e.starts_with("p.asm:1: No such file or directory: ") && e.ends_with("missing/no.asm\n          include 'no.asm'"), "{e}");
+    let e = error("missing", "        include 'no.asm'\n").replace('\\', "/");
+    assert!(e.starts_with("p.asm:1: ") && e.ends_with("missing/no.asm\n          include 'no.asm'"), "{e}");
 
     // An error in an included file is on its line there.
     let dir = write("included", &[("p.asm", "        nop\n        include 'sub/q.asm'\n"), ("sub/q.asm", "        nop\n        foo\n")]);
-    let e = assemble(&dir.join("p.asm")).err().unwrap().to_string();
+    let e = assemble(&dir.join("p.asm")).err().unwrap().to_string().replace('\\', "/");
     assert!(e.ends_with("included/sub/q.asm:2: unknown mnemonic FOO\n          foo"), "{e}");
 }
