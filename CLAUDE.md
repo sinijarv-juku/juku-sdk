@@ -4,7 +4,12 @@ Tools for writing Juku programs in 8080 assembler, in Rust: a Cargo
 workspace with a crate per tool in `crates/<name>`, the library
 `juku_<name>` and, with a `src/main.rs`, the command `juku-<name>`.
 `README.md` is the overview; `docs/<name>.md` describes each tool, file
-formats too. Keep them in step with the code.
+formats too. Keep them in step with the code. Write them as a professional
+technical writer would: neutral and factual, with no hype or marketing
+tone, in American spelling (behavior, color, center, gray, catalog,
+startup). Nothing has been tried on a real machine, so do not state that
+a program or a name behaves there as it does in the emulator: say what it
+is based on, or that it should.
 
 - `crates/asm` is `juku-asm`, the assembler. Names keep their case.
 - `crates/disk` is `juku-disk`, files on EKDOS disk images. Its tests make

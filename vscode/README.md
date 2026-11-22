@@ -2,7 +2,7 @@
 
 Writing and debugging Juku programs in VS Code:
 
-- the language `juku-asm` for `.asm` files: juku-asm's syntax, coloured,
+- the language `juku-asm` for `.asm` files: juku-asm's syntax, colored,
   and breakpoints;
 - the debug type `juku`, which connects VS Code to the debug server of the
   Juku emulator, [juku-emu](https://github.com/sinijarv-juku/juku-emu) (its
@@ -82,7 +82,7 @@ Assemble with debug information:
 juku-asm bounce.asm bounce.bin -g bounce.dbg
 ```
 
-Breakpoints can then be set in the `.asm` files, which the extension colours
+Breakpoints can then be set in the `.asm` files, which the extension colors
 as the language `juku-asm`. Steps go by source line, over calls (F10) or
 into them (F11); frames and the disassembly are named by the program's
 labels.
