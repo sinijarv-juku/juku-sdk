@@ -1,0 +1,19 @@
+# juku-dis, the 8080 disassembler: a command, and a library. Its instructions
+# are juku-i8080's; names come from include files through juku-asm.
+# `juku-dis --version` prints the SDK's version.
+
+[package]
+name = "juku-dis"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The Intel 8080 disassembler for Juku programs: a listing, or source that assembles back to the same bytes"
+
+[lib]
+name = "juku_dis"
+
+[dependencies]
+juku-asm = { path = "../asm" }
+juku-i8080 = { path = "../i8080" }

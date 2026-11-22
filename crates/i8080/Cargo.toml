@@ -1,0 +1,14 @@
+# juku-i8080, the Intel 8080's instruction set as a table: what juku-asm
+# assembles and juku-dis disassembles. A library only. No dependencies.
+
+[package]
+name = "juku-i8080"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The Intel 8080's instruction set as a table"
+
+[lib]
+name = "juku_i8080"

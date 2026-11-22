@@ -1,0 +1,250 @@
+                          ; opcodes.asm: every documented 8080 instruction, in opcode order, with
+                          ; 34h as each byte operand and 1234h as each address. Assembled, it is the
+                          ; 244 opcodes from 00h to FFh, without the twelve undocumented ones.
+                          
+0100                              org 100h
+                          
+0100  00               4          nop
+0101  01 34 12        10          lxi  b, 1234h
+0104  02               7          stax b
+0105  03               5          inx  b
+0106  04               5          inr  b
+0107  05               5          dcr  b
+0108  06 34            7          mvi  b, 34h
+010A  07               4          rlc
+010B  09              10          dad  b
+010C  0A               7          ldax b
+010D  0B               5          dcx  b
+010E  0C               5          inr  c
+010F  0D               5          dcr  c
+0110  0E 34            7          mvi  c, 34h
+0112  0F               4          rrc
+0113  11 34 12        10          lxi  d, 1234h
+0116  12               7          stax d
+0117  13               5          inx  d
+0118  14               5          inr  d
+0119  15               5          dcr  d
+011A  16 34            7          mvi  d, 34h
+011C  17               4          ral
+011D  19              10          dad  d
+011E  1A               7          ldax d
+011F  1B               5          dcx  d
+0120  1C               5          inr  e
+0121  1D               5          dcr  e
+0122  1E 34            7          mvi  e, 34h
+0124  1F               4          rar
+0125  21 34 12        10          lxi  h, 1234h
+0128  22 34 12        16          shld 1234h
+012B  23               5          inx  h
+012C  24               5          inr  h
+012D  25               5          dcr  h
+012E  26 34            7          mvi  h, 34h
+0130  27               4          daa
+0131  29              10          dad  h
+0132  2A 34 12        16          lhld 1234h
+0135  2B               5          dcx  h
+0136  2C               5          inr  l
+0137  2D               5          dcr  l
+0138  2E 34            7          mvi  l, 34h
+013A  2F               4          cma
+013B  31 34 12        10          lxi  sp, 1234h
+013E  32 34 12        13          sta  1234h
+0141  33               5          inx  sp
+0142  34              10          inr  m
+0143  35              10          dcr  m
+0144  36 34           10          mvi  m, 34h
+0146  37               4          stc
+0147  39              10          dad  sp
+0148  3A 34 12        13          lda  1234h
+014B  3B               5          dcx  sp
+014C  3C               5          inr  a
+014D  3D               5          dcr  a
+014E  3E 34            7          mvi  a, 34h
+0150  3F               4          cmc
+0151  40               5          mov  b, b
+0152  41               5          mov  b, c
+0153  42               5          mov  b, d
+0154  43               5          mov  b, e
+0155  44               5          mov  b, h
+0156  45               5          mov  b, l
+0157  46               7          mov  b, m
+0158  47               5          mov  b, a
+0159  48               5          mov  c, b
+015A  49               5          mov  c, c
+015B  4A               5          mov  c, d
+015C  4B               5          mov  c, e
+015D  4C               5          mov  c, h
+015E  4D               5          mov  c, l
+015F  4E               7          mov  c, m
+0160  4F               5          mov  c, a
+0161  50               5          mov  d, b
+0162  51               5          mov  d, c
+0163  52               5          mov  d, d
+0164  53               5          mov  d, e
+0165  54               5          mov  d, h
+0166  55               5          mov  d, l
+0167  56               7          mov  d, m
+0168  57               5          mov  d, a
+0169  58               5          mov  e, b
+016A  59               5          mov  e, c
+016B  5A               5          mov  e, d
+016C  5B               5          mov  e, e
+016D  5C               5          mov  e, h
+016E  5D               5          mov  e, l
+016F  5E               7          mov  e, m
+0170  5F               5          mov  e, a
+0171  60               5          mov  h, b
+0172  61               5          mov  h, c
+0173  62               5          mov  h, d
+0174  63               5          mov  h, e
+0175  64               5          mov  h, h
+0176  65               5          mov  h, l
+0177  66               7          mov  h, m
+0178  67               5          mov  h, a
+0179  68               5          mov  l, b
+017A  69               5          mov  l, c
+017B  6A               5          mov  l, d
+017C  6B               5          mov  l, e
+017D  6C               5          mov  l, h
+017E  6D               5          mov  l, l
+017F  6E               7          mov  l, m
+0180  6F               5          mov  l, a
+0181  70               7          mov  m, b
+0182  71               7          mov  m, c
+0183  72               7          mov  m, d
+0184  73               7          mov  m, e
+0185  74               7          mov  m, h
+0186  75               7          mov  m, l
+0187  76               7          hlt
+0188  77               7          mov  m, a
+0189  78               5          mov  a, b
+018A  79               5          mov  a, c
+018B  7A               5          mov  a, d
+018C  7B               5          mov  a, e
+018D  7C               5          mov  a, h
+018E  7D               5          mov  a, l
+018F  7E               7          mov  a, m
+0190  7F               5          mov  a, a
+0191  80               4          add  b
+0192  81               4          add  c
+0193  82               4          add  d
+0194  83               4          add  e
+0195  84               4          add  h
+0196  85               4          add  l
+0197  86               7          add  m
+0198  87               4          add  a
+0199  88               4          adc  b
+019A  89               4          adc  c
+019B  8A               4          adc  d
+019C  8B               4          adc  e
+019D  8C               4          adc  h
+019E  8D               4          adc  l
+019F  8E               7          adc  m
+01A0  8F               4          adc  a
+01A1  90               4          sub  b
+01A2  91               4          sub  c
+01A3  92               4          sub  d
+01A4  93               4          sub  e
+01A5  94               4          sub  h
+01A6  95               4          sub  l
+01A7  96               7          sub  m
+01A8  97               4          sub  a
+01A9  98               4          sbb  b
+01AA  99               4          sbb  c
+01AB  9A               4          sbb  d
+01AC  9B               4          sbb  e
+01AD  9C               4          sbb  h
+01AE  9D               4          sbb  l
+01AF  9E               7          sbb  m
+01B0  9F               4          sbb  a
+01B1  A0               4          ana  b
+01B2  A1               4          ana  c
+01B3  A2               4          ana  d
+01B4  A3               4          ana  e
+01B5  A4               4          ana  h
+01B6  A5               4          ana  l
+01B7  A6               7          ana  m
+01B8  A7               4          ana  a
+01B9  A8               4          xra  b
+01BA  A9               4          xra  c
+01BB  AA               4          xra  d
+01BC  AB               4          xra  e
+01BD  AC               4          xra  h
+01BE  AD               4          xra  l
+01BF  AE               7          xra  m
+01C0  AF               4          xra  a
+01C1  B0               4          ora  b
+01C2  B1               4          ora  c
+01C3  B2               4          ora  d
+01C4  B3               4          ora  e
+01C5  B4               4          ora  h
+01C6  B5               4          ora  l
+01C7  B6               7          ora  m
+01C8  B7               4          ora  a
+01C9  B8               4          cmp  b
+01CA  B9               4          cmp  c
+01CB  BA               4          cmp  d
+01CC  BB               4          cmp  e
+01CD  BC               4          cmp  h
+01CE  BD               4          cmp  l
+01CF  BE               7          cmp  m
+01D0  BF               4          cmp  a
+01D1  C0              11          rnz
+01D2  C1              10          pop  b
+01D3  C2 34 12        10          jnz  1234h
+01D6  C3 34 12        10          jmp  1234h
+01D9  C4 34 12        17          cnz  1234h
+01DC  C5              11          push b
+01DD  C6 34            7          adi  34h
+01DF  C7              11          rst  0
+01E0  C8              11          rz
+01E1  C9              10          ret
+01E2  CA 34 12        10          jz   1234h
+01E5  CC 34 12        17          cz   1234h
+01E8  CD 34 12        17          call 1234h
+01EB  CE 34            7          aci  34h
+01ED  CF              11          rst  1
+01EE  D0              11          rnc
+01EF  D1              10          pop  d
+01F0  D2 34 12        10          jnc  1234h
+01F3  D3 34           10          out  34h
+01F5  D4 34 12        17          cnc  1234h
+01F8  D5              11          push d
+01F9  D6 34            7          sui  34h
+01FB  D7              11          rst  2
+01FC  D8              11          rc
+01FD  DA 34 12        10          jc   1234h
+0200  DB 34           10          in   34h
+0202  DC 34 12        17          cc   1234h
+0205  DE 34            7          sbi  34h
+0207  DF              11          rst  3
+0208  E0              11          rpo
+0209  E1              10          pop  h
+020A  E2 34 12        10          jpo  1234h
+020D  E3              18          xthl
+020E  E4 34 12        17          cpo  1234h
+0211  E5              11          push h
+0212  E6 34            7          ani  34h
+0214  E7              11          rst  4
+0215  E8              11          rpe
+0216  E9               5          pchl
+0217  EA 34 12        10          jpe  1234h
+021A  EB               4          xchg
+021B  EC 34 12        17          cpe  1234h
+021E  EE 34            7          xri  34h
+0220  EF              11          rst  5
+0221  F0              11          rp
+0222  F1              10          pop  psw
+0223  F2 34 12        10          jp   1234h
+0226  F3               4          di
+0227  F4 34 12        17          cp   1234h
+022A  F5              11          push psw
+022B  F6 34            7          ori  34h
+022D  F7              11          rst  6
+022E  F8              11          rm
+022F  F9               5          sphl
+0230  FA 34 12        10          jm   1234h
+0233  FB               4          ei
+0234  FC 34 12        17          cm   1234h
+0237  FE 34            7          cpi  34h
+0239  FF              11          rst  7

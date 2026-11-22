@@ -1,0 +1,28 @@
+cargo-features = ["panic-immediate-abort"]
+
+# juku-sdk: tools for writing Juku programs. Each crate in crates/<name> is
+# the package juku-<name>, and with a src/main.rs, the command juku-<name>.
+#
+# One version for the whole SDK, semantic (README.md, Versions), kept here
+# only. Built as juku-emu builds its Rust code: build.sh and build.cmd build
+# std from source (-Z build-std), for smaller commands, so plain
+# `cargo build --release` does not work; `cargo test` does. Nightly Rust:
+# rust-toolchain.toml.
+
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT"
+repository = "https://github.com/sinijarv-juku/juku-sdk"
+
+# As juku-emu's core (its core/Cargo.toml).
+[profile.release]
+opt-level = 2
+lto = true
+codegen-units = 1
+panic = "immediate-abort"

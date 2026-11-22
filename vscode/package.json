@@ -1,0 +1,221 @@
+{
+    "name": "juku",
+    "displayName": "Juku",
+    "description": "Juku E5101/E5104 programs in juku-asm's 8080 assembler: the language, and debugging them on the Juku emulator over DAP: launch them, step by line or instruction, breakpoints, registers, memory.",
+    "version": "0.0.0",
+    "publisher": "sinijarv-juku",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/sinijarv-juku/juku-sdk"
+    },
+    "homepage": "https://github.com/sinijarv-juku/juku-sdk/tree/main/vscode",
+    "bugs": {
+        "url": "https://github.com/sinijarv-juku/juku-sdk/issues"
+    },
+    "engines": {
+        "vscode": "^1.90.0"
+    },
+    "categories": [
+        "Programming Languages",
+        "Debuggers"
+    ],
+    "main": "./extension.js",
+    "activationEvents": [
+        "onDebug"
+    ],
+    "contributes": {
+        "configuration": {
+            "title": "Juku",
+            "properties": {
+                "juku.port": {
+                    "type": "number",
+                    "default": 5104,
+                    "description": "The port Juku's debug server listens on, on 127.0.0.1."
+                },
+                "juku.app": {
+                    "type": "string",
+                    "default": "Juku",
+                    "description": "The Juku app the debugger starts when nothing listens on the port: a name macOS knows (open -a), or the path of the .app."
+                }
+            }
+        },
+        "debuggers": [
+            {
+                "type": "juku",
+                "label": "Juku",
+                "configurationAttributes": {
+                    "attach": {
+                        "properties": {
+                            "port": {
+                                "type": "number",
+                                "description": "The port Juku's debug server listens on. The juku.port setting by default."
+                            },
+                            "debugInfo": {
+                                "type": [
+                                    "string",
+                                    "array"
+                                ],
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Debug information to load: .dbg files written by juku-asm -g. Line breakpoints, stepping by line and names come from it."
+                            },
+                            "stepIntoInterrupts": {
+                                "type": "boolean",
+                                "default": false,
+                                "description": "Steps stop at an interrupt handler's first instruction, instead of running through the handler."
+                            },
+                            "systemSymbols": {
+                                "type": "boolean",
+                                "default": true,
+                                "description": "Load RomBios's entry points and variables, and EKDOS's addresses when it is in memory, as symbols."
+                            }
+                        }
+                    },
+                    "launch": {
+                        "required": [
+                            "program"
+                        ],
+                        "properties": {
+                            "program": {
+                                "type": "string",
+                                "description": "The program to load into memory: a .COM file or a binary image."
+                            },
+                            "debugInfo": {
+                                "type": [
+                                    "string",
+                                    "array"
+                                ],
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Debug information to load; by default the .dbg file beside the program, if there is one."
+                            },
+                            "args": {
+                                "type": "string",
+                                "description": "The command tail under EKDOS, as typed after the program's name."
+                            },
+                            "stopOnEntry": {
+                                "type": "boolean",
+                                "default": false,
+                                "description": "Stop before the program's first instruction."
+                            },
+                            "reset": {
+                                "type": "boolean",
+                                "default": false,
+                                "description": "Power cycle the machine first; the program then starts at the monitor's prompt. With this or snapshot the launch can be restarted."
+                            },
+                            "load": {
+                                "type": "number",
+                                "description": "Where the program is loaded: the debug information's load address, or 256 (0100h)."
+                            },
+                            "entry": {
+                                "type": "number",
+                                "description": "Where the program starts: the debug information's entry, or the load address."
+                            },
+                            "exit": {
+                                "type": "number",
+                                "description": "The address the program returns to, which ends the session: 0 (EKDOS's warm boot) or 65476 (FFC4h, MONITOR) by default."
+                            },
+                            "stepIntoInterrupts": {
+                                "type": "boolean",
+                                "default": false,
+                                "description": "Steps stop at an interrupt handler's first instruction, instead of running through the handler."
+                            },
+                            "port": {
+                                "type": "number",
+                                "description": "The port Juku's debug server listens on. The juku.port setting by default."
+                            },
+                            "systemSymbols": {
+                                "type": "boolean",
+                                "default": true,
+                                "description": "Load RomBios's entry points and variables, and EKDOS's addresses when it is in memory, as symbols."
+                            },
+                            "snapshot": {
+                                "type": "string",
+                                "description": "A Juku snapshot (.jukusnap) to open first, as Machine → Open Snapshot would: each run, and each restart, starts from it. Take it at the monitor's * or EKDOS's A>."
+                            }
+                        }
+                    }
+                },
+                "initialConfigurations": [
+                    {
+                        "type": "juku",
+                        "request": "launch",
+                        "name": "Launch on Juku",
+                        "program": "${workspaceFolder}/program.com",
+                        "stopOnEntry": true
+                    },
+                    {
+                        "type": "juku",
+                        "request": "attach",
+                        "name": "Attach to Juku"
+                    }
+                ],
+                "configurationSnippets": [
+                    {
+                        "label": "Juku: Launch",
+                        "description": "Load a program into memory at the prompt and start it",
+                        "body": {
+                            "type": "juku",
+                            "request": "launch",
+                            "name": "Launch on Juku",
+                            "program": "^\"\\${workspaceFolder}/${1:program}.com\"",
+                            "stopOnEntry": true
+                        }
+                    },
+                    {
+                        "label": "Juku: Attach",
+                        "description": "Attach to the running emulator",
+                        "body": {
+                            "type": "juku",
+                            "request": "attach",
+                            "name": "Attach to Juku"
+                        }
+                    },
+                    {
+                        "label": "Juku: Attach with debug information",
+                        "description": "Attach, with the symbols and lines of a program assembled with -g",
+                        "body": {
+                            "type": "juku",
+                            "request": "attach",
+                            "name": "Attach to Juku",
+                            "debugInfo": [
+                                "^\"\\${workspaceFolder}/${1:program}.dbg\""
+                            ]
+                        }
+                    }
+                ],
+                "languages": [
+                    "juku-asm"
+                ]
+            }
+        ],
+        "languages": [
+            {
+                "id": "juku-asm",
+                "aliases": [
+                    "Juku 8080 Assembler",
+                    "juku-asm"
+                ],
+                "extensions": [
+                    ".asm"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "breakpoints": [
+            {
+                "language": "juku-asm"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "juku-asm",
+                "scopeName": "source.juku-asm",
+                "path": "./syntaxes/juku-asm.tmLanguage.json"
+            }
+        ]
+    }
+}

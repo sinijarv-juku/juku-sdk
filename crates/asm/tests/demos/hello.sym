@@ -1,0 +1,9 @@
+CR 000D
+LF 000A
+MONITOR FFC4
+TTO FFD9
+greeting 012B
+main 0100
+main.count 0108
+newline 013A
+print 0121

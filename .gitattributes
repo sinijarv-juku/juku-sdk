@@ -1,0 +1,8 @@
+# Text files keep LF in every checkout, whatever core.autocrlf says.
+* text=auto eol=lf
+*.bin binary
+# Windows' own scripts, with Windows' line endings in every checkout.
+*.cmd text eol=crlf
+# The asm demos and what they must assemble to, compared byte for byte: kept
+# as stored, whatever core.autocrlf says.
+crates/asm/tests/demos/** -text

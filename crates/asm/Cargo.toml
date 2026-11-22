@@ -1,0 +1,18 @@
+# juku-asm, the 8080 assembler for Juku programs: a command, and a library.
+# Its instructions are juku-i8080's. `juku-asm --version` prints the SDK's
+# version.
+
+[package]
+name = "juku-asm"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The Intel 8080 assembler for Juku programs: image, listing, symbols and debug information"
+
+[lib]
+name = "juku_asm"
+
+[dependencies]
+juku-i8080 = { path = "../i8080" }

@@ -1,0 +1,89 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Juku 8080 Assembler",
+    "scopeName": "source.juku-asm",
+    "comment": "The syntax of juku-asm: Intel 8080 mnemonics, its directives, labels with a colon or in the first column, numbers as 123, 0FFh, 1010b, 'c'.",
+    "patterns": [
+        {
+            "include": "#comment"
+        },
+        {
+            "include": "#label"
+        },
+        {
+            "include": "#string"
+        },
+        {
+            "include": "#directive"
+        },
+        {
+            "include": "#mnemonic"
+        },
+        {
+            "include": "#register"
+        },
+        {
+            "include": "#function"
+        },
+        {
+            "include": "#number"
+        },
+        {
+            "include": "#operator"
+        }
+    ],
+    "repository": {
+        "comment": {
+            "name": "comment.line.semicolon.juku-asm",
+            "match": ";.*$"
+        },
+        "label": {
+            "patterns": [
+                {
+                    "match": "^\\s*([A-Za-z_?@.][\\w?@.]*):",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.function.label.juku-asm"
+                        }
+                    }
+                },
+                {
+                    "match": "^([A-Za-z_?@.][\\w?@.]*)(?=\\s|$)",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.function.label.juku-asm"
+                        }
+                    }
+                }
+            ]
+        },
+        "string": {
+            "name": "string.quoted.single.juku-asm",
+            "match": "'(?:[^']|'')*'"
+        },
+        "directive": {
+            "name": "keyword.control.directive.juku-asm",
+            "match": "(?i)\\b(?:ORG|EQU|DB|DW|DS|ALIGN|REPT|ENDM|IF|ELSE|ENDIF|INCLUDE|INCBIN|ASSERT|BSS)\\b"
+        },
+        "mnemonic": {
+            "name": "keyword.other.mnemonic.juku-asm",
+            "match": "(?i)(?<=\\s|:)(?:LHLD|SHLD|LDAX|STAX|XCHG|CALL|PCHL|SPHL|XTHL|PUSH|MOV|MVI|LXI|LDA|STA|ADD|ADI|ADC|ACI|SUB|SUI|SBB|SBI|INR|DCR|INX|DCX|DAD|DAA|ANA|ANI|XRA|XRI|ORA|ORI|CMP|CPI|RLC|RRC|RAL|RAR|CMA|CMC|STC|JMP|JNZ|JNC|JPO|JPE|CNZ|CNC|CPO|CPE|RET|RNZ|RNC|RPO|RPE|RST|POP|OUT|HLT|NOP|JZ|JC|JP|JM|CZ|CC|CP|CM|RZ|RC|RP|RM|IN|EI|DI)\\b"
+        },
+        "register": {
+            "name": "variable.language.register.juku-asm",
+            "match": "(?i)(?<=[\\s,])(?:PSW|SP|[ABCDEHLM])\\b(?![\\w?@.])"
+        },
+        "function": {
+            "name": "support.function.juku-asm",
+            "match": "(?i)\\b(?:HIGH|LOW)(?=\\s*\\()"
+        },
+        "number": {
+            "name": "constant.numeric.juku-asm",
+            "match": "(?i)\\b\\d[0-9a-f]*[hbd]?\\b|\\$"
+        },
+        "operator": {
+            "name": "keyword.operator.juku-asm",
+            "match": "<<|>>|==|!=|<=|>=|[-+*/%&|^~!<>]"
+        }
+    }
+}

@@ -1,0 +1,8 @@
+# Nightly Rust with the standard library's source: build.sh and build.cmd
+# build std from source (-Z build-std) for smaller commands, and the release
+# profile's immediate-abort panics are a nightly feature. The nightly is
+# pinned by date, so that every build uses the same compiler; a newer one is
+# taken on purpose, by changing the date here and in juku-emu.
+[toolchain]
+channel = "nightly-2026-11-19"
+components = ["rust-src"]

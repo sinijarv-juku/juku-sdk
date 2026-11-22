@@ -1,0 +1,94 @@
+                          ; directives.asm: every directive, local labels and expressions. Not meant
+                          ; to run; its image, listing, symbols and debug information are the test.
+                          
+                          DEBUG   equ 0
+                          ROWS    equ 4
+                          WIDTH   equ ROWS * 2 + 1        ; 9
+                          SCREEN  equ 0d800h
+                          AFTER   equ last                ; a label defined further on
+                          
+0100                              org 100h
+                          
+0100  C3 07 01        10  start:  jmp main
+0103  BA DC                       dw 0dcbah               ; data among the code
+0105  70 00                       dw image_end - 100h
+                          
+0107  21 09 D8        10  main:   lxi h, SCREEN + WIDTH
+010A  3E D8            7          mvi a, high(SCREEN)
+010C  06 34            7          mvi b, low(SCREEN + 1234h)
+010E  11 0E 01        10          lxi d, $                ; the address of this instruction
+0111  01 04 09        10          lxi b, (WIDTH << 8) | ROWS
+0114  0E FF            7          mvi c, -1
+0116  3E 0A            7          mvi a, 'J' - 'A' + 1
+0118  3E 27            7          mvi a, ''''
+011A  21 70 01        10          lxi h, AFTER
+011D  C3 22 01        10          jmp draw.loop           ; a local label from outside its scope
+                          
+0120  06 04            7  draw:   mvi b, ROWS
+0122  05               5  .loop:  dcr b
+0123  C2 22 01        10          jnz .loop
+0126  C9              10          ret
+                          
+                                  if DEBUG
+                                  db 'debug'              ; left out
+                                  else
+                                  if ROWS > 2
+0127  72 6F 77 73                 db 'rows'
+                                  endif
+                                  endif
+                          
+                                  if !DEBUG & (WIDTH == 9)
+012B  00               4          nop
+                                  endif
+                          
+012C                      table:  rept ROWS               ; four rows: the offset in the table, two nops
+012C  00                          db $ - table
+012D  00               4          nop
+012E  00               4          nop
+012F  03                          db $ - table
+0130  00               4          nop
+0131  00               4          nop
+0132  06                          db $ - table
+0133  00               4          nop
+0134  00               4          nop
+0135  09                          db $ - table
+0136  00               4          nop
+0137  00               4          nop
+                          
+                          
+                                  include 'lib/text.asm'
+                          ; text.asm: included by directives.asm, from the folder it is in.
+                          
+                          ; Copies the string at HL, ended by a 0, to DE; HL and DE end past it.
+0138  7E               7  copy:   mov a, m
+0139  12               7          stax d
+013A  23               5          inx h
+013B  13               5          inx d
+013C  B7               4          ora a
+013D  C2 38 01        10          jnz copy
+0140  C9              10          ret
+                          
+0141  18 24 42 7E …       glyph:  incbin 'glyph.bin'      ; the letter A, 8 rows; relative to this file
+0149                      .end:
+                          GLYPH_ROWS equ glyph.end - glyph
+                          
+0149  00 00 00 00 …               align 16
+0150                      aligned:
+0150  0A 0C FF 80 …               db 1010b, 12d, 0ffh, -128, 'x'
+0155  00 00 00                    ds 3                    ; three zeros
+0158  AA AA                       ds 2, 0aah
+015A                      message:
+015A  49 74 27 73 …               db 'It''s a ', '"test"', 0
+0168  01 00 FF FF …       words:  dw 1, -1, 0ffffh + 2, message
+                                  assert $ < 1000h, 'too big for the test'
+                                  assert GLYPH_ROWS == 8
+0170                      last:
+0170                      image_end:
+                          
+0300                              org 300h                ; a gap of zeros in the image
+0300  65 6E 64                    db 'end'
+                          
+0303                              bss                     ; reserved memory: not in the image
+0303                      buffer: ds 64
+0343                      .end:
+0343                      flag:   ds 1

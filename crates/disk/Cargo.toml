@@ -1,0 +1,14 @@
+# juku-disk, files on EKDOS disk images: a command, and a library. No
+# dependencies. `juku-disk --version` prints the SDK's version.
+
+[package]
+name = "juku-disk"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Files on the Juku's EKDOS disk images: list, copy off, put on, remove; blank disks"
+
+[lib]
+name = "juku_disk"
