@@ -10,8 +10,8 @@ Writing and debugging Juku programs in VS Code:
   Adapter Protocol itself; the extension only names the debug type and
   connects, and starts the emulator when it is not running.
 
-The language works on any system. Debugging needs Juku's macOS app for
-now: the Windows app has no debug server yet.
+The language works on any system. Debugging needs Juku's macOS or Windows
+app.
 
 ## Trying it
 
@@ -36,6 +36,12 @@ now: the Windows app has no debug server yet.
    `/path/to/juku-emu/target/Juku.app`. A Juku already running needs
    Settings → Machine → Debugger: Accept Connections ticked, or
    `--debug-server` on its command line.
+
+   On Windows the extension starts `Juku.exe` where the installer puts it
+   (`%LOCALAPPDATA%\Programs\Juku`), or from the PATH; `juku.app` can name
+   another, such as `D:\juku-emu\target\windows\Juku.exe`. A Juku already
+   running there takes the port from the new start, which then exits, so
+   it need not have Accept Connections ticked.
 3. Pause stops the machine wherever it is. Where there is no source,
    right-click a frame and choose Open Disassembly View to step by
    instruction. Registers are under Variables and can be changed.

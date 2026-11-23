@@ -36,7 +36,7 @@
                 "juku.app": {
                     "type": "string",
                     "default": "Juku",
-                    "description": "The Juku app the debugger starts when nothing listens on the port: a name macOS knows (open -a), or the path of the .app."
+                    "description": "The Juku app the debugger starts when nothing listens on the port: on macOS a name it knows (open -a) or the path of the .app; on Windows the path of Juku.exe. On Windows the default looks where the installer puts Juku, then on the PATH."
                 }
             }
         },

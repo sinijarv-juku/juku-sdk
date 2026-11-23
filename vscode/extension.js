@@ -4,7 +4,9 @@
 'use strict';
 
 const vscode = require('vscode');
+const fs = require('fs');
 const net = require('net');
+const path = require('path');
 const { spawn } = require('child_process');
 
 // How long the app may take to start listening, and how often to look.
@@ -23,11 +25,28 @@ function listening(port) {
     });
 }
 
+// The program to start on Windows: for the setting's default name, Juku.exe
+// where the installer puts it, if it is there; otherwise the setting, a
+// program on the PATH or a path.
+function windowsApp(app) {
+    if (app === 'Juku' && process.env.LOCALAPPDATA) {
+        const installed = path.join(process.env.LOCALAPPDATA, 'Programs', 'Juku', 'Juku.exe');
+        if (fs.existsSync(installed)) {
+            return installed;
+        }
+    }
+    return app;
+}
+
 // Starts the app with its debug server on: `open -a` on macOS, which takes
-// an app's name or its path; elsewhere the program itself.
+// an app's name or its path; elsewhere the program itself. On Windows a Juku
+// already running takes the port from the new start, which then exits.
 function startApp(app, port) {
     const flag = `--debug-server=${port}`;
-    const [command, args] = process.platform === 'darwin' ? ['open', ['-a', app, '--args', flag]] : [app, [flag]];
+    const [command, args] =
+        process.platform === 'darwin'
+            ? ['open', ['-a', app, '--args', flag]]
+            : [process.platform === 'win32' ? windowsApp(app) : app, [flag]];
     spawn(command, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
 }
 
@@ -40,9 +59,12 @@ async function connect(session) {
         while (!(await listening(port))) {
             if (Date.now() > deadline) {
                 throw new Error(
-                    `Nothing listens on port ${port}. If Juku is running, tick Settings → Machine → Debugger: ` +
-                        'Accept Connections, or quit it so that the debugger can start it. The juku.app setting ' +
-                        'names the app to start.',
+                    process.platform === 'win32'
+                        ? `Nothing listens on port ${port}. The juku.app setting names the program to start: ` +
+                              'the path of Juku.exe, if it is not where the installer puts it.'
+                        : `Nothing listens on port ${port}. If Juku is running, tick Settings → Machine → Debugger: ` +
+                              'Accept Connections, or quit it so that the debugger can start it. The juku.app setting ' +
+                              'names the app to start.',
                 );
             }
             await new Promise((resolve) => setTimeout(resolve, START_POLL_MS));
