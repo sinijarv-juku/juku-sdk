@@ -2,7 +2,7 @@
     "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
     "name": "Juku 8080 Assembler",
     "scopeName": "source.juku-asm",
-    "comment": "The syntax of juku-asm: Intel 8080 mnemonics, its directives, labels with a colon or in the first column, numbers as 123, 0FFh, 1010b, 'c'.",
+    "comment": "The syntax of juku-asm: Intel 8080 mnemonics, its directives, labels with a colon or in the first column, anonymous labels (: and :- :+), numbers as 123, 0FFh, 1010b, 'c'.",
     "patterns": [
         {
             "include": "#comment"
@@ -24,6 +24,9 @@
         },
         {
             "include": "#function"
+        },
+        {
+            "include": "#anonymous"
         },
         {
             "include": "#number"
@@ -48,6 +51,15 @@
                     }
                 },
                 {
+                    "comment": "An anonymous label: a colon alone in the first column.",
+                    "match": "^(:)(?=\\s|$)",
+                    "captures": {
+                        "1": {
+                            "name": "entity.name.function.label.juku-asm"
+                        }
+                    }
+                },
+                {
                     "match": "^([A-Za-z_?@.][\\w?@.]*)(?=\\s|$)",
                     "captures": {
                         "1": {
@@ -62,8 +74,21 @@
             "match": "'(?:[^']|'')*'"
         },
         "directive": {
-            "name": "keyword.control.directive.juku-asm",
-            "match": "(?i)\\b(?:ORG|EQU|DB|DW|DS|ALIGN|REPT|ENDM|IF|ELSE|ENDIF|INCLUDE|INCBIN|ASSERT|BSS)\\b"
+            "patterns": [
+                {
+                    "name": "keyword.control.directive.juku-asm",
+                    "match": "(?i)\\b(?:ORG|EQU|SET|DB|DW|DS|ALIGN|REPT|FOR|MACRO|ENDM|IF|ELSEIF|ELSE|ENDIF|INCLUDE|INCBIN|ASSERT|CODE|CONST|DATA|BSS|OPT|STRUCT|UNION|ENDS)\\b"
+                },
+                {
+                    "comment": "INCLUDE 'file' AS name: AS after the file name only.",
+                    "match": "(?i)(?<=')\\s+(AS)(?=\\s)",
+                    "captures": {
+                        "1": {
+                            "name": "keyword.control.directive.juku-asm"
+                        }
+                    }
+                }
+            ]
         },
         "mnemonic": {
             "name": "keyword.other.mnemonic.juku-asm",
@@ -75,7 +100,12 @@
         },
         "function": {
             "name": "support.function.juku-asm",
-            "match": "(?i)\\b(?:HIGH|LOW)(?=\\s*\\()"
+            "match": "(?i)\\b(?:HIGH|LOW|START|END|SIZE|SAME|REG|PAIR|CONST|BLANK|COUNT|DEFINED|REVERSE|CSTR|UPPER|LOWER)(?=\\s*\\()"
+        },
+        "anonymous": {
+            "comment": "A reference to an anonymous label: :- :-- :+ :++.",
+            "name": "variable.other.label.juku-asm",
+            "match": ":(?:-+|\\++)"
         },
         "number": {
             "name": "constant.numeric.juku-asm",

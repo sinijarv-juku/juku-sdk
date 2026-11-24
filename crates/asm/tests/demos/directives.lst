@@ -4,24 +4,24 @@
                           DEBUG   equ 0
                           ROWS    equ 4
                           WIDTH   equ ROWS * 2 + 1        ; 9
-                          SCREEN  equ 0d800h
-                          AFTER   equ last                ; a label defined further on
+                          screen  equ 0d800h
+                          after   equ last                ; a label defined further on
                           
 0100                              org 100h
                           
 0100  C3 07 01        10  start:  jmp main
 0103  BA DC                       dw 0dcbah               ; data among the code
-0105  70 00                       dw image_end - 100h
+0105  0D 02                       dw end(data) - 100h     ; the image's length
                           
-0107  21 09 D8        10  main:   lxi h, SCREEN + WIDTH
-010A  3E D8            7          mvi a, high(SCREEN)
-010C  06 34            7          mvi b, low(SCREEN + 1234h)
+0107  21 09 D8        10  main:   lxi h, screen + WIDTH
+010A  3E D8            7          mvi a, high(screen)
+010C  06 34            7          mvi b, low(screen + 1234h)
 010E  11 0E 01        10          lxi d, $                ; the address of this instruction
 0111  01 04 09        10          lxi b, (WIDTH << 8) | ROWS
 0114  0E FF            7          mvi c, -1
 0116  3E 0A            7          mvi a, 'J' - 'A' + 1
 0118  3E 27            7          mvi a, ''''
-011A  21 70 01        10          lxi h, AFTER
+011A  21 70 01        10          lxi h, after
 011D  C3 22 01        10          jmp draw.loop           ; a local label from outside its scope
                           
 0120  06 04            7  draw:   mvi b, ROWS
@@ -83,12 +83,19 @@
                                   assert $ < 1000h, 'too big for the test'
                                   assert GLYPH_ROWS == 8
 0170                      last:
-0170                      image_end:
                           
 0300                              org 300h                ; a gap of zeros in the image
 0300  65 6E 64                    db 'end'
                           
-0303                              bss                     ; reserved memory: not in the image
-0303                      buffer: ds 64
-0343                      .end:
-0343                      flag:   ds 1
+030C                              data                    ; after CONST, which is after CODE
+030C                      counter:
+030C  00                          db 0
+0307                              const
+0307  64 65 6D 6F …       title:  db 'demo', 0
+0303                              code                    ; CODE again, where it was left
+0303  07 03 41 00                 dw start(const), size(bss)
+                          
+030D                              bss                     ; reserved memory: not in the image
+030D                      buffer: ds 64
+034D                      .end:
+034D                      flag:   ds 1

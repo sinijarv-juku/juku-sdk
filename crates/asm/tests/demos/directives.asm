@@ -4,24 +4,24 @@
 DEBUG   equ 0
 ROWS    equ 4
 WIDTH   equ ROWS * 2 + 1        ; 9
-SCREEN  equ 0d800h
-AFTER   equ last                ; a label defined further on
+screen  equ 0d800h
+after   equ last                ; a label defined further on
 
         org 100h
 
 start:  jmp main
         dw 0dcbah               ; data among the code
-        dw image_end - 100h
+        dw end(data) - 100h     ; the image's length
 
-main:   lxi h, SCREEN + WIDTH
-        mvi a, high(SCREEN)
-        mvi b, low(SCREEN + 1234h)
+main:   lxi h, screen + WIDTH
+        mvi a, high(screen)
+        mvi b, low(screen + 1234h)
         lxi d, $                ; the address of this instruction
         lxi b, (WIDTH << 8) | ROWS
         mvi c, -1
         mvi a, 'J' - 'A' + 1
         mvi a, ''''
-        lxi h, AFTER
+        lxi h, after
         jmp draw.loop           ; a local label from outside its scope
 
 draw:   mvi b, ROWS
@@ -65,10 +65,17 @@ words:  dw 1, -1, 0ffffh + 2, message
         assert $ < 1000h, 'too big for the test'
         assert GLYPH_ROWS == 8
 last:
-image_end:
 
         org 300h                ; a gap of zeros in the image
         db 'end'
+
+        data                    ; after CONST, which is after CODE
+counter:
+        db 0
+        const
+title:  db 'demo', 0
+        code                    ; CODE again, where it was left
+        dw start(const), size(bss)
 
         bss                     ; reserved memory: not in the image
 buffer: ds 64

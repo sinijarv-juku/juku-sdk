@@ -12,13 +12,29 @@ a program or a name behaves there as it does in the emulator: say what it
 is based on, or that it should.
 
 - `crates/asm` is `juku-asm`, the assembler. Names keep their case.
+- **juku-asm is to be easy to use**, with simple syntax, and its author
+  should never have to think about how it works inside, its passes above
+  all. Say a rule in the source's terms (above, below, in this file, the
+  first error in the source), never in passes; an error names the line and
+  what is wrong there. A feature whose behavior depends on the passes is
+  reworked until it does not, as errors were when an early pass's error
+  hid an `assert` above it.
 - `crates/disk` is `juku-disk`, files on EKDOS disk images. Its tests make
   their images: real disk images are other people's software, not to be put
   in the repository.
+- `demos/` holds demo programs for the machine (`bounce.asm`,
+  `scroller.asm`) and the images they assemble to. `crates/demos` is
+  `juku-demos`, a library with both (`include_str!`, `include_bytes!`):
+  juku-emu's tests and benchmark run them, and its debug server's tests
+  find `bounce.asm`'s lines by their text (`bounce_line`), so change those
+  lines with them. Its test checks that each image is what its source
+  assembles to; `JUKU_ASM_BLESS=1 cargo test -p juku-demos` writes them
+  anew.
 
-- `include/` holds the include files for RomBios, EKDOS and the ports, built
-  into `juku-asm` (`crates/asm/src/headers.rs`, `include_str!`; a new file
-  goes into its list). They are the source of the names: juku-emu's
+- `include/` holds the include files for RomBios, EKDOS and the ports, and
+  `macros.inc` (macros, no names), built into `juku-asm`
+  (`crates/asm/src/headers.rs`, `include_str!`; a new file goes into its
+  list). They are the source of the names: juku-emu's
   `resources/symbols/rombios.dbg` and `ekdos.dbg` must have the same names
   and values, which its debug server's test `system_symbols_are_the_sdks`
   checks. Change both together. Values come from juku-emu's machine
@@ -47,6 +63,7 @@ is based on, or that it should.
 build.cmd [debug|install]     # the same on Windows -> target\bin\*.exe
 cargo test                    # every crate's tests
 JUKU_ASM_BLESS=1 cargo test -p juku-asm   # writes the asm demos' expected outputs anew
+JUKU_ASM_BLESS=1 cargo test -p juku-demos # writes demos/*.bin anew
 python3 vscode/package.py && code --install-extension target/juku.vsix   # the VS Code extension
 ```
 
@@ -70,16 +87,24 @@ python3 vscode/package.py && code --install-extension target/juku.vsix   # the V
   diff.
 - **Who uses it.** juku-emu (`../juku-emu`): its debug server reads the
   debug information (`debugger/dap/src/info.rs`, its spec §12.6) and its
-  tests assemble its demos with `juku-asm`'s library, a git dependency on
-  this repository at a release tag. Programs built with `juku-asm` rely on
+  tests assemble `demos/bounce.asm` with `juku-asm`'s library and run the
+  demos' images from `juku-demos`, git dependencies on this repository at a
+  release tag. Programs built with `juku-asm` rely on
   its output, so a change must keep what a source assembles to (image,
   listing, symbols, debug information) the same unless that is the point;
   the demos' expected outputs are the test. A change to the debug
   information's format goes into juku-emu's loader and spec too.
 - **Assembly source** written here is lower case: mnemonics, registers,
-  directives, labels and hex digits (`mvi a, 0ffh`). Constants defined with
-  `equ` are upper case (`TTO equ 0ffd9h`). Names are case-sensitive;
-  mnemonics, registers and directives are not.
+  directives, labels and hex digits (`mvi a, 0ffh`). A name defined with
+  `equ` is upper case only for a constant, such as a count, size, mask or
+  character (`ROWS equ 4`, `ESC equ 1bh`); one for an address, a port or
+  an offset is lower case, as a label is (`tto equ 0ffd9h`, `o_x equ 1`).
+  The include files keep to this. Source here includes `rombios.inc` as
+  `rb`, `ekdos.inc` as `dos` and `ports.inc` as `io` (`call rb.tto`, `call
+  dos.bdos`, `out io.t2_1`), and so does what `juku-dis -s` writes. An
+  anonymous label (`:`, `jnz :-`) only where a name would be noise, one
+  that would have to be made up (`.ok`, `.wait2` beside `.wait`). Names are
+  case-sensitive; mnemonics, registers and directives are not.
 - **Versions**: one for the SDK, semantic, in the workspace's `Cargo.toml`
   (`[workspace.package]`) only; crates take it with `version.workspace =
   true`. It has `-dev` after it while the next version is being made.

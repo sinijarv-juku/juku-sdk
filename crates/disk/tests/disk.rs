@@ -162,4 +162,16 @@ fn command() {
     assert!(!ok && err.contains("nosuch.txt: no such file"), "{err}");
     assert_eq!(run(&["rm", "d.juk", "read.me"]).1, "READ.ME\n");
     assert!(run(&["ls", "d.juk"]).1.starts_with("d.juk: 1 file,"));
+
+    // The options anywhere after the command, before the image too.
+    let (ok, text, _) = run(&["get", "-a", "-f", "-o", "all", "d.juk"]);
+    assert!(ok && text.contains("PROG.COM 384"), "{text}");
+    assert!(run(&["new", "-f", "e.juk"]).0);
+    let first = |args: &[&str]| run(args).2.lines().next().unwrap_or("").to_string();
+    assert_eq!(first(&["get", "d.juk"]), "juku-disk: get takes names, or -a for every file");
+    assert_eq!(first(&["get", "-a", "d.juk", "*.com"]), "juku-disk: get takes -a or names, not both");
+    assert_eq!(first(&["put", "d.juk"]), "juku-disk: put takes an image and files");
+    assert_eq!(first(&["ls", "-x", "d.juk"]), "juku-disk: unknown option -x");
+    assert_eq!(first(&["get", "d.juk", "-o"]), "juku-disk: -o takes a value");
+    assert_eq!(first(&["dir", "d.juk"]), "juku-disk: unknown command dir");
 }

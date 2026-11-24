@@ -2,13 +2,42 @@
 //! instruction after another from where it is told to start.
 //!
 //! Instructions are written as the SDK's source is: `lxi h, 012bh`,
-//! `call TTO`. An undocumented opcode is written as the bytes it is, `db`,
+//! `call rb.tto`. An undocumented opcode is written as the bytes it is, `db`,
 //! with what it does in a comment, so that the source assembles back to the
 //! same bytes; so is an instruction cut off by the end of the image.
 
 use std::collections::{HashMap, HashSet};
 
 use juku_i8080::{Data, OPS};
+
+/// The name the SDK's source includes the include file `file` under, as in
+/// `include 'rombios.inc' as rb`: `rb` for `rombios.inc`, `dos` for
+/// `ekdos.inc`, `io` for `ports.inc`; none for another file, which is
+/// included as it is.
+pub fn namespace(file: &str) -> Option<&'static str> {
+    match file {
+        "rombios.inc" => Some("rb"),
+        "ekdos.inc" => Some("dos"),
+        "ports.inc" => Some("io"),
+        _ => None,
+    }
+}
+
+/// `name` from the include file `file`, as the source names it: `rb.tto`.
+pub fn qualified(file: &str, name: &str) -> String {
+    match namespace(file) {
+        Some(ns) => format!("{ns}.{name}"),
+        None => name.to_string(),
+    }
+}
+
+/// The line that includes `file`, as the SDK's source writes it.
+pub fn include_line(file: &str) -> String {
+    match namespace(file) {
+        Some(ns) => format!("        include '{file}' as {ns}\n"),
+        None => format!("        include '{file}'\n"),
+    }
+}
 
 /// Names for values: addresses for word operands, ports for IN and OUT.
 #[derive(Default)]

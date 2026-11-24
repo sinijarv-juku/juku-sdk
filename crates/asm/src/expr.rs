@@ -1,12 +1,14 @@
 //! Operand expressions, evaluated by recursive descent.
 
-use crate::asm::{Assembler, Error, Result, name_len};
+use crate::asm::{Assembler, CALLERS, Error, Result, SECTIONS, check_caller, name_len};
 
 #[derive(Clone, PartialEq)]
 enum Token<'a> {
     Num(i64),
     /// Qualified: a local label has its scope.
     Name(String),
+    /// An anonymous label: -1 for `:-`, 2 for `:++`.
+    Anon(i64),
     Op(&'a str),
 }
 
@@ -47,7 +49,18 @@ fn tokens<'a>(text: &'a str, asm: &Assembler) -> Result<Vec<Token<'a>>> {
         } else if let Some((v, n)) = char_literal(s) {
             (Token::Num(v), n)
         } else if let n @ 1.. = name_len(s) {
+            check_caller(&s[..n], asm.depth())?;
             (Token::Name(asm.qualify(&s[..n])), n)
+        } else if let Some(rest) = s.strip_prefix(CALLERS)
+            && !matches!(out.last(), Some(Token::Num(_) | Token::Name(_) | Token::Anon(_) | Token::Op(")")))
+            && let n @ 1.. = name_len(rest)
+        {
+            // A full name, as a macro's argument: `^name`.
+            (Token::Name(format!("{CALLERS}{}", &rest[..n])), 1 + n)
+        } else if let Some(rest) = s.strip_prefix(':') {
+            let sign = rest.chars().next().filter(|c| *c == '+' || *c == '-').ok_or_else(|| Error::new("expected :+ or :-"))?;
+            let n = rest.chars().take_while(|&c| c == sign).count();
+            (Token::Anon(if sign == '-' { -(n as i64) } else { n as i64 }), 1 + n)
         } else if c == '$' {
             (Token::Num(asm.here), 1)
         } else {
@@ -129,7 +142,10 @@ impl<'a> Expr<'a, '_> {
             Some(Token::Op("~")) => Ok(!self.unary()?),
             Some(Token::Op("!")) => Ok((self.unary()? == 0) as i64),
             Some(Token::Op("(")) => self.parenthesized(),
+            Some(Token::Op("[")) => Err(Error::new("a list is not a number")),
             Some(Token::Num(v)) => Ok(v),
+            Some(Token::Anon(_)) if self.asm.strict => Err(Error::new("not known yet")),
+            Some(Token::Anon(n)) => self.asm.anon(n),
             Some(Token::Name(name)) => {
                 let base = if name.starts_with('.') { name.rsplit('.').next().unwrap_or("") } else { &name };
                 let (high, low) = (base.eq_ignore_ascii_case("HIGH"), base.eq_ignore_ascii_case("LOW"));
@@ -138,10 +154,44 @@ impl<'a> Expr<'a, '_> {
                     let v = self.parenthesized()?;
                     return Ok(if high { (v >> 8) & 0xFF } else { v & 0xFF });
                 }
-                if let Some(&v) = self.asm.symbols.get(&name) {
+                let bound = ["START", "END", "SIZE"].iter().position(|f| name.eq_ignore_ascii_case(f));
+                if let Some(what) = bound
+                    && self.peek() == Some(&Token::Op("("))
+                {
+                    self.pos += 1;
+                    let arg = self.take();
+                    let section = match &arg {
+                        Some(Token::Name(s)) => SECTIONS.iter().position(|n| s.eq_ignore_ascii_case(n)),
+                        _ => None,
+                    };
+                    let closed = self.take() == Some(Token::Op(")"));
+                    // SIZE() of a struct.
+                    if let (2, None, Some(Token::Name(s)), true) = (what, section, &arg, closed) {
+                        return self.asm.struct_size(s);
+                    }
+                    let (Some(section), true) = (section, closed) else {
+                        let f = name.to_lowercase();
+                        if what == 2 {
+                            return Err(Error::new("size() takes a section (code, const, data, bss) or a struct"));
+                        }
+                        return Err(Error::new(format!("{f}() takes a section: code, const, data or bss")));
+                    };
+                    if self.asm.strict {
+                        return Err(Error::new("not known yet"));
+                    }
+                    return Ok(self.asm.bound(what, section));
+                }
+                if self.asm.strict && !self.asm.is_defined(&name) {
+                    return Err(Error::new("not known yet"));
+                }
+                if let Some(v) = self.asm.lookup(&name)? {
                     return Ok(v);
                 }
                 if self.asm.last_pass {
+                    let name = name.trim_start_matches('^');
+                    if self.asm.is_struct(name) {
+                        return Err(Error::new(format!("{name} is a struct, not a number: size({name}) is its size")));
+                    }
                     return Err(Error::new(format!("undefined symbol {name}")));
                 }
                 self.asm.unresolved = true;

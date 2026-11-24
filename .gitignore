@@ -3,3 +3,6 @@
 !.gitattributes
 !.github
 /target/
+/demos/*.dbg
+/demos/*.lst
+/demos/*.sym

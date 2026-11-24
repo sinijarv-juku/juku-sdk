@@ -20,6 +20,11 @@ fn opcodes(mn: &str) -> &'static [u8] {
     table.get(mn).map_or(&[], Vec::as_slice)
 }
 
+/// `mn`, in upper case, is an instruction's mnemonic.
+pub(crate) fn is_mnemonic(mn: &str) -> bool {
+    !opcodes(mn).is_empty()
+}
+
 /// The bytes of instruction `mn` with operands `ops`, and its cycle count:
 /// the taken count for a conditional call or return.
 pub(crate) fn encode(asm: &mut Assembler, mn: &str, ops: &[&str]) -> Result<(Vec<i64>, u32)> {

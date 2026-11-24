@@ -21,7 +21,8 @@ IMAGE is an EKDOS disk: 800 KB double-sided or 400 KB single-sided; files
 are put on and removed from EKDOS's double-sided ones only. A file of user n other
 than 0 is shown and copied off as n_NAME.EXT. Files copied off keep their
 whole last record: a text file ends in ^Z padding. put and rm change IMAGE
-in place.";
+in place. The options can come anywhere after the command, before IMAGE
+too; after --, everything is a name.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -29,16 +30,19 @@ fn main() -> ExitCode {
         println!("juku-disk {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
     }
+    if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
+        println!("{USAGE}");
+        return ExitCode::SUCCESS;
+    }
     let result = match args.first().map(String::as_str) {
-        Some("ls") if args.len() == 2 => ls(&args[1]),
-        Some("get") if args.len() >= 3 => get(&args[1], &args[2..]),
-        Some("put") if args.len() >= 3 => put(&args[1], &args[2..]),
-        Some("rm") if args.len() >= 3 => rm(&args[1], &args[2..]),
-        Some("new") if args.len() >= 2 => new(&args[1], &args[2..]),
-        _ => {
-            eprintln!("{USAGE}");
-            return ExitCode::FAILURE;
-        }
+        // Each command's switches, and its options that take a value.
+        Some("ls") => Options::parse(&args[1..], &[], &[], (1, 1), "ls takes an image").and_then(|o| ls(&o)),
+        Some("get") => Options::parse(&args[1..], &["-a", "-f"], &["-o"], (1, usize::MAX), "get takes an image").and_then(|o| get(&o)),
+        Some("put") => Options::parse(&args[1..], &[], &[], (2, usize::MAX), "put takes an image and files").and_then(|o| put(&o)),
+        Some("rm") => Options::parse(&args[1..], &[], &[], (2, usize::MAX), "rm takes an image and names").and_then(|o| rm(&o)),
+        Some("new") => Options::parse(&args[1..], &["-f"], &["--system"], (1, 1), "new takes an image").and_then(|o| new(&o)),
+        Some(other) => Err(format!("juku-disk: unknown command {other}\n\n{USAGE}")),
+        None => Err(USAGE.to_string()),
     };
     match result {
         Ok(true) => ExitCode::SUCCESS,
@@ -47,6 +51,59 @@ fn main() -> ExitCode {
             eprintln!("{e}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// A command's arguments: the image, the names or files after it, and the
+/// options, which can come anywhere.
+struct Options {
+    image: String,
+    names: Vec<String>,
+    switches: Vec<&'static str>,
+    values: Vec<(&'static str, String)>,
+}
+
+impl Options {
+    /// `args` after the command, which takes the `switches`, the options
+    /// with a value `valued`, and from `count.0` to `count.1` files and
+    /// names, the image first, as `takes` says.
+    fn parse(args: &[String], switches: &[&'static str], valued: &[&'static str], count: (usize, usize), takes: &str) -> Result<Options, String> {
+        let usage = |e: String| format!("juku-disk: {e}\n\n{USAGE}");
+        let mut out = Options { image: String::new(), names: Vec::new(), switches: Vec::new(), values: Vec::new() };
+        let mut positional = Vec::new();
+        let mut i = 0;
+        let mut options = true;
+        while i < args.len() {
+            let arg = args[i].as_str();
+            i += 1;
+            if !options || !arg.starts_with('-') || arg == "-" {
+                positional.push(arg.to_string());
+            } else if arg == "--" {
+                options = false;
+            } else if let Some(&s) = switches.iter().find(|&&s| s == arg) {
+                out.switches.push(s);
+            } else if let Some(&v) = valued.iter().find(|&&v| v == arg) {
+                let value = args.get(i).ok_or_else(|| usage(format!("{arg} takes a value")))?;
+                out.values.push((v, value.clone()));
+                i += 1;
+            } else {
+                return Err(usage(format!("unknown option {arg}")));
+            }
+        }
+        if positional.len() < count.0 || positional.len() > count.1 {
+            return Err(usage(takes.to_string()));
+        }
+        out.image = positional.remove(0);
+        out.names = positional;
+        Ok(out)
+    }
+
+    fn has(&self, switch: &str) -> bool {
+        self.switches.contains(&switch)
+    }
+
+    fn value(&self, option: &str) -> Option<&String> {
+        self.values.iter().rev().find(|v| v.0 == option).map(|v| &v.1)
     }
 }
 
@@ -71,7 +128,8 @@ fn save(image: &str, disk: &Disk) -> Result<(), String> {
     std::fs::rename(&temp, path).map_err(|e| io_error(path, e))
 }
 
-fn ls(image: &str) -> Result<bool, String> {
+fn ls(o: &Options) -> Result<bool, String> {
+    let image = &o.image;
     let disk = open(image)?;
     let files = disk.files();
     println!(
@@ -129,24 +187,14 @@ fn chosen<'a>(files: &'a [File], patterns: &[&String]) -> (Vec<&'a File>, bool) 
     (out, found.iter().all(|&f| f))
 }
 
-fn get(image: &str, args: &[String]) -> Result<bool, String> {
-    let (mut all, mut force, mut folder) = (false, false, PathBuf::from("."));
-    let mut patterns = Vec::new();
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "-a" => all = true,
-            "-f" => force = true,
-            "-o" if i + 1 < args.len() => {
-                folder = PathBuf::from(&args[i + 1]);
-                i += 1;
-            }
-            _ => patterns.push(&args[i]),
-        }
-        i += 1;
-    }
+fn get(o: &Options) -> Result<bool, String> {
+    let image = &o.image;
+    let (all, force) = (o.has("-a"), o.has("-f"));
+    let folder = o.value("-o").map_or_else(|| PathBuf::from("."), PathBuf::from);
+    let patterns: Vec<&String> = o.names.iter().collect();
     if all == !patterns.is_empty() {
-        return Err(USAGE.to_string());
+        let e = if all { "-a or names, not both" } else { "names, or -a for every file" };
+        return Err(format!("juku-disk: get takes {e}\n\n{USAGE}"));
     }
     let disk = open(image)?;
     let files = disk.files();
@@ -173,9 +221,10 @@ fn get(image: &str, args: &[String]) -> Result<bool, String> {
     Ok(ok)
 }
 
-fn put(image: &str, files: &[String]) -> Result<bool, String> {
+fn put(o: &Options) -> Result<bool, String> {
+    let image = &o.image;
     let mut disk = open(image)?;
-    for path in files {
+    for path in &o.names {
         let path = Path::new(path);
         let data = std::fs::read(path).map_err(|e| io_error(path, e))?;
         let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
@@ -186,10 +235,11 @@ fn put(image: &str, files: &[String]) -> Result<bool, String> {
     Ok(true)
 }
 
-fn rm(image: &str, patterns: &[String]) -> Result<bool, String> {
+fn rm(o: &Options) -> Result<bool, String> {
+    let image = &o.image;
     let mut disk = open(image)?;
     let files = disk.files();
-    let (chosen, ok) = chosen(&files, &patterns.iter().collect::<Vec<_>>());
+    let (chosen, ok) = chosen(&files, &o.names.iter().collect::<Vec<_>>());
     for f in chosen {
         disk.remove(f).map_err(|e| format!("{image}: {e}"))?;
         println!("{}", f.shown());
@@ -198,20 +248,9 @@ fn rm(image: &str, patterns: &[String]) -> Result<bool, String> {
     Ok(ok)
 }
 
-fn new(image: &str, args: &[String]) -> Result<bool, String> {
-    let (mut force, mut system) = (false, None);
-    let mut i = 0;
-    while i < args.len() {
-        match args[i].as_str() {
-            "-f" => force = true,
-            "--system" if i + 1 < args.len() => {
-                system = Some(&args[i + 1]);
-                i += 1;
-            }
-            _ => return Err(USAGE.to_string()),
-        }
-        i += 1;
-    }
+fn new(o: &Options) -> Result<bool, String> {
+    let image = &o.image;
+    let (force, system) = (o.has("-f"), o.value("--system"));
     if Path::new(image).exists() && !force {
         return Err(format!("{image} exists (-f writes over it)"));
     }

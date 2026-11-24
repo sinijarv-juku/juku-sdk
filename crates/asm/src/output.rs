@@ -19,19 +19,28 @@ impl Program {
             if l.bytes.len() > 4 {
                 hexes.push_str(" …");
             }
+            if l.dropped {
+                hexes = "(left out)".to_string();
+            }
             let cycles = l.cycles.map(|c| c.to_string()).unwrap_or_default();
             _ = writeln!(out, "{head:4}  {hexes:14} {cycles:>3}  {}", l.raw);
         }
         out
     }
 
-    /// Every label and EQU as `name 1234`, in hex, in order of name.
+    /// Every label, EQU and struct's field as `name 1234`, in hex, in order
+    /// of name: not a macro expansion's own, or a SET.
     pub fn symbols(&self) -> String {
         let mut out = String::new();
-        for (name, v) in &self.symbols {
+        for (name, v) in self.shown() {
             _ = writeln!(out, "{name} {:04X}", v & 0xFFFF);
         }
         out
+    }
+
+    /// The symbols the outputs show.
+    fn shown(&self) -> impl Iterator<Item = (&String, &i64)> {
+        self.symbols.iter().filter(|(name, _)| !name.contains('#') && self.kinds.get(*name) != Some(&SymbolKind::Set))
     }
 
     /// The debug information (the SDK's docs/asm.md, Outputs), in JSON, to
@@ -42,7 +51,7 @@ impl Program {
     /// address, file and first line, the first line's length in bytes, then
     /// for each line after it how many lines on it is and its length. `data`
     /// is the ranges DB, DW, DS, ALIGN and INCBIN made. A label on a line of
-    /// data, or on memory reserved after BSS, has the size of that line as a
+    /// data, or on memory reserved in BSS, has the size of that line as a
     /// third field: what a watchpoint on it watches.
     pub fn debug_info(&self, dbg: &Path, image: &Path) -> String {
         let folder = path::absolute(dbg).parent().map(Path::to_path_buf).unwrap_or_default();
@@ -83,16 +92,15 @@ impl Program {
         for (a, n) in data_spans.chain(self.reserved.iter().copied()) {
             sizes.entry(a).or_insert(n);
         }
-        let mut symbols: Vec<_> = self.symbols.iter().map(|(name, v)| (v & 0xFFFF, name)).collect();
+        let mut symbols: Vec<_> = self.shown().map(|(name, v)| (v & 0xFFFF, name)).collect();
         symbols.sort();
         let (mut labels, mut equs) = (Vec::new(), Vec::new());
         for (v, name) in symbols {
             let quoted = json_string(name);
-            if self.kinds[name] == SymbolKind::Equ {
+            let size = self.sizes.get(name).or_else(|| sizes.get(&v).filter(|_| !code_at.contains(&v)));
+            if matches!(self.kinds[name], SymbolKind::Equ | SymbolKind::Field) {
                 equs.push(format!("[{quoted},{v}]"));
-            } else if let Some(n) = sizes.get(&v)
-                && !code_at.contains(&v)
-            {
+            } else if let Some(n) = size {
                 labels.push(format!("[{quoted},{v},{n}]"));
             } else {
                 labels.push(format!("[{quoted},{v}]"));

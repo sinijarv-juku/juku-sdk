@@ -24,7 +24,7 @@ app.
 
    Do it again after changing the extension, and reload VS Code's windows.
    To try a change without installing, run a window with the extension
-   loaded from this folder: `code --extensionDevelopmentPath="$PWD/vscode" crates/asm/tests/demos`.
+   loaded from this folder: `code --extensionDevelopmentPath="$PWD/vscode" demos`.
    Only that window has it.
 
    A `files.associations` setting that maps `*.asm` to another language
@@ -85,7 +85,7 @@ Assemble with debug information:
 
 ```sh
 ./build.sh install                 # juku-sdk's commands, the assembler juku-asm too
-juku-asm bounce.asm bounce.bin -g bounce.dbg
+juku-asm -g bounce.asm             # bounce.bin and bounce.dbg
 ```
 
 Breakpoints can then be set in the `.asm` files, which the extension colors
@@ -104,12 +104,12 @@ labels.
   in decimal), which prints to the Debug Console without stopping.
 - **Expressions** in the Debug Console, Watch and hovers: numbers as in the
   assembler (`0FFh`, `1010b`, `'J'`), registers, symbols (in another case
-  too, if only one matches: `conch` is CONCH), `[x]` for the byte
+  too, if only one matches: `CONCH` is `conch`), `[x]` for the byte
   at x, `w[x]` for the word, `HIGH()`, `LOW()` and the assembler's operators,
   with `&&` and `||`.
 - **Jump to Cursor** in a source file moves PC to that line.
 - RomBios's entry points and variables, and EKDOS's addresses, are known
-  by name (`CALL TTO`, `LDA CONCH`); `"systemSymbols": false` leaves them
+  by name (`CALL tto`, `LDA conch`); `"systemSymbols": false` leaves them
   out.
 
 ## Attaching
@@ -125,7 +125,7 @@ To debug a program already in memory, attach with its debug information:
 }
 ```
 
-With juku-emu's `demos/bounce.bin` as the expansion ROM, start it with `A` at the `*`
-prompt. `port` picks another port than the `juku.port` setting (5104), and
+With the SDK's `demos/bounce.bin` as the expansion ROM, start it with `A` at
+the `*` prompt. `port` picks another port than the `juku.port` setting (5104), and
 `stepIntoInterrupts` stops steps at an interrupt handler's first
 instruction.

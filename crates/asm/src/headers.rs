@@ -3,8 +3,9 @@
 //! or in an include folder.
 
 /// Each one's name and text.
-pub const HEADERS: [(&str, &str); 3] = [
+pub const HEADERS: [(&str, &str); 4] = [
     ("ekdos.inc", include_str!("../../../include/ekdos.inc")),
+    ("macros.inc", include_str!("../../../include/macros.inc")),
     ("ports.inc", include_str!("../../../include/ports.inc")),
     ("rombios.inc", include_str!("../../../include/rombios.inc")),
 ];

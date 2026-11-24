@@ -33,6 +33,10 @@ HELLO.COM            128
 - `new` makes a formatted disk with no files. Its system tracks are blank,
   so it cannot be booted, unless `--system FROM` copies them from another
   disk: an EKDOS disk to boot from, or a disk for drive B: without it.
+- The image is the first name after the command. The options can come
+  anywhere after the command, before the image too: `juku-disk get -a -o
+  out game.juk`. After `--`, everything is a name, one starting with `-`
+  too.
 - A command that cannot do all it was asked says so on standard error and
   exits with 1.
 

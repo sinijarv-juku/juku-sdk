@@ -3,8 +3,8 @@
                           ; A Juku program at 0100h: load it there and start it with G0100 at the
                           ; monitor's * prompt.
                           
-                          TTO     equ 0ffd9h              ; RomBios: print the character in A
-                          MONITOR equ 0ffc4h              ; RomBios: the monitor's warm start
+                          tto     equ 0ffd9h              ; RomBios: print the character in A
+                          monitor equ 0ffc4h              ; RomBios: the monitor's warm start
                           CR      equ 0dh
                           LF      equ 0ah
                           
@@ -14,22 +14,22 @@
 0103  CD 21 01        17          call print
 0106  06 31            7          mvi b, '1'
 0108  78               5  .count: mov a, b
-0109  CD D9 FF        17          call TTO
+0109  CD D9 FF        17          call tto
 010C  3E 20            7          mvi a, ' '
-010E  CD D9 FF        17          call TTO
+010E  CD D9 FF        17          call tto
 0111  04               5          inr b
 0112  78               5          mov a, b
 0113  FE 3A            7          cpi '9' + 1
 0115  C2 08 01        10          jnz .count
 0118  21 3A 01        10          lxi h, newline
 011B  CD 21 01        17          call print
-011E  C3 C4 FF        10          jmp MONITOR
+011E  C3 C4 FF        10          jmp monitor
                           
                           ; Prints the string at HL, ended by a 0.
 0121  7E               7  print:  mov a, m
 0122  B7               4          ora a
 0123  C8              11          rz
-0124  CD D9 FF        17          call TTO
+0124  CD D9 FF        17          call tto
 0127  23               5          inx h
 0128  C3 21 01        10          jmp print
                           

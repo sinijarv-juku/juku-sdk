@@ -1,0 +1,18 @@
+# juku-demos, the SDK's demo programs in demos/: their sources and the
+# images they assemble to, for other programs' tests and examples (juku-emu
+# runs them). A library with no dependencies.
+
+[package]
+name = "juku-demos"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The SDK's demo programs for the Juku: their sources and images"
+
+[lib]
+name = "juku_demos"
+
+[dev-dependencies]
+juku-asm = { path = "../asm" }

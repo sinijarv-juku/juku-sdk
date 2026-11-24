@@ -15,28 +15,41 @@ program from its source in VS Code, with the SDK's VS Code extension in
 `vscode/`: the language `juku-asm` for `.asm` files, and the debug type
 `juku`, which connects to the emulator ([vscode/README.md](vscode/README.md)).
 
+`demos/` has demo programs written with the SDK, raster effects for the
+expansion ROM window ([demos/README.md](demos/README.md)).
+
 ## Include files
 
-`include/` has the machine's names, as `equ` constants, for any program to
+`include/` has the machine's names, defined with `equ`, for any program to
 include. `juku-asm` has them built in, so `include 'rombios.inc'` works
-without a path.
+without a path. Addresses and ports are in lower case, as labels are; the
+SDK keeps upper case for constants such as counts, sizes, masks and the
+BDOS's function numbers.
 
 | File | |
 |---|---|
-| `rombios.inc` | RomBios 3.43's entry points (`TTO`, `CONSTAT`, `MONITOR`, …) and system variables (`CONCH`, `SQIKEY`, …) |
-| `ekdos.inc` | EKDOS's fixed addresses: `WBOOT`, `BDOS`, `TFCB`, `TFCB2`, `TBUFF` |
-| `ports.inc` | the I/O ports: `PIC_0`, `PPI1_A`…`PPI1_CTL`, `T1_0`…`T3_CTL`, `FDC_CMD`…, `MOUSE_DATA`, … |
+| `rombios.inc` | RomBios 3.43's entry points (`tto`, `constat`, `monitor`, …) and system variables (`conch`, `sqikey`, …) |
+| `ekdos.inc` | EKDOS's page zero (`wboot`, `bdos`, `tfcb`, `tbuff`, …), the BDOS functions (`C_WRITESTR`, `F_OPEN`, …) and CP/M 2.2's structs: `fcb`, `dirent`, `dpb` |
+| `ports.inc` | the I/O ports: `pic_0`, `ppi1_a`…`ppi1_ctl`, `t1_0`…`t3_ctl`, `fdc_cmd`…, `mouse_data`, … |
+| `macros.inc` | macros, not names: `pushr` and `popr`, `save` and `restore` for register pairs ([docs/asm.md](docs/asm.md)) |
 
 ```asm
-        include 'rombios.inc'
-        include 'ports.inc'
+        include 'rombios.inc' as rb
+        include 'ekdos.inc' as dos
+        include 'ports.inc' as io
 
         org 100h
 main:   mvi a, 'J'
-        call TTO
-        in T2_0                 ; lines left in the frame
-        ret
+        call rb.tto
+        in io.t2_0              ; lines left in the frame
+        jmp dos.wboot
 ```
+
+The SDK's own source includes them so, under `rb`, `dos` and `io`, and
+`juku-dis` writes them so: a program can then have names of its own like
+these (`move`, `fill`, `fcb`). A plain `include 'rombios.inc'` defines them as they
+are, and `include 'rombios.inc' (tto, crlf)` only those it lists
+([docs/asm.md](docs/asm.md), Namespaces).
 
 They come from juku-emu's [machine description](https://github.com/sinijarv-juku/juku-emu/blob/main/docs/Juku_machine_description.md), whose debugger
 names the same RomBios and EKDOS addresses. The names and addresses are a
@@ -64,7 +77,8 @@ needs the Visual Studio Build Tools too.
 Each tool is a crate in `crates/<name>`: the library `juku_<name>` and the
 command `juku-<name>`. `crates/i8080`, a library only, is the 8080's
 instruction set as a table, which the assembler and the disassembler share.
-They have no dependencies but each other.
+`crates/demos`, a library only, holds the demos' sources and images for
+other programs' tests. They have no dependencies but each other.
 
 ## Versions
 
@@ -93,8 +107,8 @@ its layout may change in any release.
 A release is the commit that drops `-dev` from the version, `build: bump the
 version to X.Y.Z`, tagged `vX.Y.Z`; the next commit starts the next one,
 `build: start version X.Y+1.0-dev`. Pushing the tag drafts the GitHub
-release: the commands for macOS, Linux and Windows with the include files,
-and the VS Code extension (`.github/workflows/release.yml`); it is
+release: the commands for macOS, Linux and Windows with the include files
+and the demos, and the VS Code extension (`.github/workflows/release.yml`); it is
 published by hand. Every push to `main` and every pull request is tested
 and built on the three systems (`.github/workflows/ci.yml`), except one
 that changes only documentation (Markdown files and `docs/`).

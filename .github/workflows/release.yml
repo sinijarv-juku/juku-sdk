@@ -53,7 +53,7 @@ jobs:
           dir=juku-sdk-${TAG#v}-${{ matrix.platform }}
           mkdir -p dist/$dir
           cp target/bin/* LICENSE README.md dist/$dir/
-          cp -R include dist/$dir/
+          cp -R include demos dist/$dir/
           cd dist
           if [ "$RUNNER_OS" = Windows ]; then 7z a -bd -tzip $dir.zip $dir >/dev/null; else tar czf $dir.tar.gz $dir; fi
           rm -r $dir
@@ -84,4 +84,4 @@ jobs:
         run: |
           gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --draft \
               --title "juku-sdk ${TAG#v}" \
-              --notes "juku-sdk ${TAG#v}: juku-asm, juku-disk and juku-dis for each system, with the include files, and the VS Code extension (code --install-extension juku-${TAG#v}.vsix)."
+              --notes "juku-sdk ${TAG#v}: juku-asm, juku-disk and juku-dis for each system, with the include files and the demos, and the VS Code extension (code --install-extension juku-${TAG#v}.vsix)."

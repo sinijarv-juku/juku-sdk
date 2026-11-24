@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use juku_dis::{Names, disassemble, hex, listing, source};
+use juku_dis::{Names, disassemble, hex, include_line, listing, qualified, source};
 
 /// juku-asm's demos, assembled.
 const DEMOS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../asm/tests/demos");
@@ -49,20 +49,23 @@ fn names() {
     let image = [0xCD, 0xD9, 0xFF, 0xD3, 0x15, 0x3A, 0xBB, 0xD4, 0xC3, 0x00, 0x01];
     let mut names = Names::default();
     for (name, value) in juku_asm::names("rombios.inc", &juku_asm::Options::default()).unwrap() {
-        names.word(value as u16, &name);
+        names.word(value as u16, &qualified("rombios.inc", &name));
     }
     for (name, value) in juku_asm::names("ports.inc", &juku_asm::Options::default()).unwrap() {
-        names.port(value as u8, &name);
+        names.port(value as u8, &qualified("ports.inc", &name));
     }
     let lines = disassemble(&image, 0x100, 0x100, 0x10B, &names, true);
     let texts: Vec<&str> = lines.iter().map(|l| l.text.as_str()).collect();
-    assert_eq!(texts, ["call TTO", "out T2_1", "lda CONCH", "jmp l0100"]);
+    assert_eq!(texts, ["call rb.tto", "out io.t2_1", "lda rb.conch", "jmp l0100"]);
     assert_eq!(lines[0].label.as_deref(), Some("l0100"));
-    let head = "        include 'rombios.inc'\n        include 'ports.inc'\n";
-    assert_eq!(round_trip("names", &image, &names, head), image);
+    let head = include_line("rombios.inc") + &include_line("ports.inc");
+    assert_eq!(head, "        include 'rombios.inc' as rb\n        include 'ports.inc' as io\n");
+    assert_eq!(qualified("ekdos.inc", "bdos"), "dos.bdos");
+    assert_eq!(include_line("ekdos.inc"), "        include 'ekdos.inc' as dos\n");
+    assert_eq!(round_trip("names", &image, &names, &head), image);
     assert_eq!(
         listing(&lines),
-        "0100  CD D9 FF  call TTO\n0103  D3 15     out T2_1\n0105  3A BB D4  lda CONCH\n0108  C3 00 01  jmp l0100\n"
+        "0100  CD D9 FF  call rb.tto\n0103  D3 15     out io.t2_1\n0105  3A BB D4  lda rb.conch\n0108  C3 00 01  jmp l0100\n"
     );
 }
 
