@@ -87,7 +87,7 @@ jobs:
         run: |
           previous=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || echo "the first commit")
           cat > notes.md <<EOF
-          juku-sdk ${TAG#v}: juku-asm, juku-disk, juku-dis and juku-lsp for each system, with the include files and the demos, and the VS Code extension (\`code --install-extension juku-${TAG#v}.vsix\`).
+          juku-sdk ${TAG#v}: juku-asm, juku-disk, juku-dis and juku-lsp for each system, with the include files and the demos, and the VS Code extension.
 
           ## Changes that need a source or a script changed
 
