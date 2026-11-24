@@ -136,6 +136,18 @@ python3 vscode/package.py && code --install-extension target/juku.vsix   # the V
   bump it in a change; a release is its own commit, dropping `-dev`,
   `build: bump the version to X.Y.Z`, tagged `vX.Y.Z`, and the next commit
   starts `X.Y+1.0-dev`.
+- **Release notes**: the tag's draft (`release.yml`) has the summary line
+  and TODOs for the changes, which are written before it is published
+  (`git log vPREV..vX.Y.Z`): first what a source or script must change,
+  or that nothing must, then the changes by tool. Only what a user of a
+  command or the VS Code extension sees changed: no library API (a new
+  function, an `Options` field), no internal crates (`juku-json`,
+  `juku-demos`), no refactoring or code moved, no changes to tests, the
+  build or the documentation alone. Neutral and factual, as the docs are:
+  say what was added or changed, in plain items, with no bold labels and no
+  tour of a feature's details. A new tool is one line saying what it is,
+  with a link to its doc page. No installation instructions: each tool's
+  doc page has them.
 - **No dependencies**, but each other's crates in this workspace.
 - **Commits:** a subject in the Neovim repository's style, `type(scope):
   subject`, with type one of `build ci docs feat fix perf refactor revert
