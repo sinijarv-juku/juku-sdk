@@ -146,8 +146,9 @@ python3 vscode/package.py && code --install-extension target/juku.vsix   # the V
   build or the documentation alone. Neutral and factual, as the docs are:
   say what was added or changed, in plain items, with no bold labels and no
   tour of a feature's details. A new tool is one line saying what it is,
-  with a link to its doc page. No installation instructions: each tool's
-  doc page has them.
+  with a link to its doc page. Installation instructions only for the
+  whole released package; one tool's or the extension's are on its doc
+  page.
 - **No dependencies**, but each other's crates in this workspace.
 - **Commits:** a subject in the Neovim repository's style, `type(scope):
   subject`, with type one of `build ci docs feat fix perf refactor revert
