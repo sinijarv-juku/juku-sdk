@@ -4,21 +4,21 @@ version = 4
 
 [[package]]
 name = "juku-asm"
-version = "0.3.0"
+version = "0.4.0-dev"
 dependencies = [
  "juku-i8080",
 ]
 
 [[package]]
 name = "juku-demos"
-version = "0.3.0"
+version = "0.4.0-dev"
 dependencies = [
  "juku-asm",
 ]
 
 [[package]]
 name = "juku-dis"
-version = "0.3.0"
+version = "0.4.0-dev"
 dependencies = [
  "juku-asm",
  "juku-i8080",
@@ -26,19 +26,19 @@ dependencies = [
 
 [[package]]
 name = "juku-disk"
-version = "0.3.0"
+version = "0.4.0-dev"
 
 [[package]]
 name = "juku-i8080"
-version = "0.3.0"
+version = "0.4.0-dev"
 
 [[package]]
 name = "juku-json"
-version = "0.3.0"
+version = "0.4.0-dev"
 
 [[package]]
 name = "juku-lsp"
-version = "0.3.0"
+version = "0.4.0-dev"
 dependencies = [
  "juku-asm",
  "juku-i8080",
