@@ -45,11 +45,33 @@ is based on, or that it should.
   assembles from it and `juku-dis` disassembles with it; juku-emu's debug
   server checks its core's own disassembler against it
   (`cpu_disassembler_is_the_sdks`).
+- `crates/lsp` is `juku-lsp`, the language server: LSP on stdin and
+  stdout, with `juku-json`'s framing. `Server` (`server.rs`) is the
+  protocol as a state machine, messages in and out, which its tests drive;
+  `project.rs` is the workspace: open documents, which file includes
+  which, the main files, and assembling them with `juku_asm::index` and
+  the editor's unsaved text. Its errors are juku-asm's, unchanged.
+  `names.rs` keeps each main file's names; `navigate.rs` answers
+  definition, references, hover and symbols from them, a word matched to
+  a name by the uses the index has on its line; `edit.rs` completion,
+  operands, rename, folding and inlay hints.
+- `crates/json` is `juku-json`, a library: JSON values, their parser and
+  writer, and the `Content-Length` framing DAP and LSP share
+  (`frame.rs`). juku-emu's debug server is built on it, so juku-emu's app
+  links it: it has no `format!` (numbers as text by hand, `text.rs`) and
+  no floating point (a number that is not whole stays text), to keep that
+  app small (juku-emu's spec §12.1-12.2). Keep it so, and check the
+  app's size after a change.
 - `vscode/` is the VS Code extension `juku` (publisher `sinijarv-juku`):
   the language `juku-asm` (`syntaxes/juku-asm.tmLanguage.json`, juku-asm's
   syntax: keep it in step with the assembler) and the debug type `juku`,
   which connects to juku-emu's debug server; the launch settings in
-  `package.json` are what that server takes (juku-emu's spec §12).
+  `package.json` are what that server takes (juku-emu's spec §12). It
+  also starts `juku-lsp` (`lsp.js`, a client written by hand on `rpc.js`,
+  JSON-RPC with no vscode in it); its settings are the server's
+  (docs/lsp.md, Settings), so change them together. Juku: Build
+  (`build.js`) runs `juku-asm` on the main files the server's
+  `juku/mainFiles` names; `tools.js` finds the SDK's commands.
   `vscode/package.py` packs it as `target/juku.vsix` without npm, with the
   SDK's version.
 - `crates/dis` is `juku-dis`, the disassembler. With `-s` it writes source
@@ -85,8 +107,9 @@ python3 vscode/package.py && code --install-extension target/juku.vsix   # the V
   demo's `.bin`, `.lst`, `.sym` and `.dbg` beside it are what it must
   assemble to. Bless only after a change meant to change them, and read the
   diff.
-- **Who uses it.** juku-emu (`../juku-emu`): its debug server reads the
-  debug information (`debugger/dap/src/info.rs`, its spec §12.6) and its
+- **Who uses it.** juku-emu (`../juku-emu`): its debug server is built on
+  `juku-json` and reads the
+  debug information (`debugger/dap/src/info.rs`, its spec §12.6), and its
   tests assemble `demos/bounce.asm` with `juku-asm`'s library and run the
   demos' images from `juku-demos`, git dependencies on this repository at a
   release tag. Programs built with `juku-asm` rely on

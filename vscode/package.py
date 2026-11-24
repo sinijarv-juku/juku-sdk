@@ -18,8 +18,8 @@ from xml.sax.saxutils import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..')
-FILES = ['extension.js', 'README.md', 'language-configuration.json',
-         'syntaxes/juku-asm.tmLanguage.json']
+FILES = ['extension.js', 'lsp.js', 'rpc.js', 'build.js', 'tools.js', 'README.md',
+         'language-configuration.json', 'syntaxes/juku-asm.tmLanguage.json']
 
 CONTENT_TYPES = '''<?xml version="1.0" encoding="utf-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">

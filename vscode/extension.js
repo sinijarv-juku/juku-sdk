@@ -1,6 +1,7 @@
 // The Juku emulator is its own debug adapter: it speaks DAP on 127.0.0.1
 // (juku-emu's spec §12.8). This extension names the debug type, connects to it, and
-// starts the app when nothing listens.
+// starts the app when nothing listens. The language server, juku-lsp, is
+// started by lsp.js, and Juku: Build (build.js) runs juku-asm.
 'use strict';
 
 const vscode = require('vscode');
@@ -73,7 +74,67 @@ async function connect(session) {
     return new vscode.DebugAdapterServer(port, '127.0.0.1');
 }
 
+// After a stop in code with no source, such as a step into a RomBios
+// routine, VS Code shows the first frame that has some: the call's line,
+// while the CPU is elsewhere, and each step after it goes on unseen. The
+// frame where the CPU is is shown instead, in the Disassembly view, as
+// juku-emu's spec §12.5 means it; steps there go by instruction. VS Code
+// picks its frame again as the call stack comes in, so for a moment after
+// the stop the pick is undone; after that another frame can be picked.
+const SETTLE_MS = 1500;
+
+function showWhereTheCpuIs(context) {
+    // Each session whose last stop's top frame has no source: when it came,
+    // and whether the Disassembly view has been opened for it.
+    const unseen = new Map();
+    context.subscriptions.push(
+        vscode.debug.registerDebugAdapterTrackerFactory('juku', {
+            createDebugAdapterTracker(session) {
+                let stopped = false;
+                return {
+                    onDidSendMessage(m) {
+                        if (m.type === 'event' && (m.event === 'stopped' || m.event === 'continued')) {
+                            stopped = m.event === 'stopped';
+                            unseen.delete(session.id);
+                        } else if (stopped && m.type === 'response' && m.command === 'stackTrace' && m.success) {
+                            const top = (m.body.stackFrames || []).find((f) => f.id === 0);
+                            if (top) {
+                                stopped = false;
+                                if (!top.source) {
+                                    unseen.set(session.id, { at: Date.now(), shown: false });
+                                }
+                            }
+                        }
+                    },
+                    onExit() {
+                        unseen.delete(session.id);
+                    },
+                };
+            },
+        }),
+        vscode.debug.onDidChangeActiveStackItem(async (item) => {
+            const stop = item && item.frameId !== undefined && unseen.get(item.session.id);
+            if (!stop || Date.now() - stop.at > SETTLE_MS) {
+                return;
+            }
+            if (item.frameId > 0) {
+                // Up the call stack to frame 0: the server numbers frames
+                // from 0, the top, and Focus Top Stack Frame is VS Code's pick.
+                for (let k = item.frameId; k > 0; k--) {
+                    await vscode.commands.executeCommand('workbench.action.debug.callStackUp');
+                }
+            } else if (!stop.shown) {
+                stop.shown = true;
+                await vscode.commands.executeCommand('debug.action.openDisassemblyView');
+            }
+        }),
+    );
+}
+
 function activate(context) {
+    showWhereTheCpuIs(context);
+    const client = require('./lsp').activate(context);
+    require('./build').activate(context, client);
     context.subscriptions.push(
         vscode.debug.registerDebugAdapterDescriptorFactory('juku', {
             createDebugAdapterDescriptor: connect,

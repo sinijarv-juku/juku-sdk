@@ -10,35 +10,62 @@ use crate::headers::{PREFIX, header};
 use crate::macros::{self, Macro, Macros, Values};
 use crate::{encode, expr, path};
 
+mod index;
 mod structs;
+pub use index::{Definition, Include, Index, NameKind, Placed, Use, index};
+use index::Record;
 use structs::Struct;
 
 /// An error in the source, or a file that could not be read. Once placed,
-/// it starts with the file and line and ends with the line.
+/// it shows the file and line first and the line as written last.
 #[derive(Debug)]
 pub struct Error {
-    message: String,
-    located: bool,
+    /// The file, as the assembler names it, and the line in it, from 1.
+    place: Option<(String, usize)>,
+    /// What is wrong.
+    text: String,
+    /// The line as written.
+    raw: Option<String>,
 }
 
 impl Error {
     pub(crate) fn new(message: impl Into<String>) -> Error {
-        Error { message: message.into(), located: false }
+        Error { place: None, text: message.into(), raw: None }
     }
 
     /// The error, placed at `line` unless it is placed already.
     fn at(self, line: &Line) -> Error {
-        if self.located {
+        if self.place.is_some() {
             return self;
         }
-        let message = format!("{}:{}: {}\n  {}", path::shown(&line.path), line.number, self, line.raw);
-        Error { message, located: true }
+        Error { place: Some((line.path.to_string(), line.number)), raw: Some(line.raw.clone()), ..self }
+    }
+
+    /// The file the error is in, named as [`Index`] names files, and the
+    /// line, from 1. None for an error in no one line: a main file that
+    /// cannot be read, a program with no code, sections that never settle.
+    pub fn place(&self) -> Option<(&str, usize)> {
+        self.place.as_ref().map(|(file, line)| (file.as_str(), *line))
+    }
+
+    /// What is wrong, without the file and the line. In a macro's expansion
+    /// it is placed at the call, and this names the macro and the line in
+    /// it: `in name: file:line: message`.
+    pub fn message(&self) -> &str {
+        &self.text
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.message)
+        if let Some((file, line)) = &self.place {
+            write!(f, "{}:{line}: ", path::shown(file))?;
+        }
+        f.write_str(&self.text)?;
+        if let Some(raw) = &self.raw {
+            write!(f, "\n  {raw}")?;
+        }
+        Ok(())
     }
 }
 
@@ -118,6 +145,12 @@ pub struct Options {
     /// The folders INCLUDE and INCBIN look in, in order, for a file that is
     /// not beside the including file.
     pub include: Vec<PathBuf>,
+    /// Source files' text to take in place of what is on disk, as an
+    /// editor has it before saving, by path. Paths are compared made
+    /// absolute, from the current folder, as text: two names for one file
+    /// (a link, a drive letter in another case) are two files. INCBIN reads
+    /// the disk.
+    pub sources: HashMap<PathBuf, String>,
 }
 
 /// Assembles the program whose main file is `path`.
@@ -127,23 +160,9 @@ pub fn assemble(path: &Path) -> Result<Program> {
 
 /// Assembles the program whose main file is `path`, as `options` say.
 pub fn assemble_with(path: &Path, options: &Options) -> Result<Program> {
-    let mut asm = Assembler::new(path.to_string_lossy().into(), options.include.clone());
+    let mut asm = Assembler::new(path.to_string_lossy().into(), options);
     asm.run()?;
-    let (Some((&first, _)), Some((&last, _))) = (asm.out.first_key_value(), asm.out.last_key_value()) else {
-        return Err(Error::new(format!("{}: no code", path.display())));
-    };
-    let load = asm.org.unwrap_or(first);
-    let image = (load..=last).map(|a| asm.out.get(&a).copied().unwrap_or(0)).collect();
-    Ok(Program {
-        load,
-        image,
-        symbols: asm.symbols,
-        kinds: asm.kinds,
-        listing: asm.listing,
-        spans: asm.spans,
-        reserved: asm.reserved,
-        sizes: asm.sizes,
-    })
+    asm.program(path)
 }
 
 /// The names include file `name` defines, labels and constants but not a
@@ -151,7 +170,7 @@ pub fn assemble_with(path: &Path, options: &Options) -> Result<Program> {
 /// would find it, so `rombios.inc` is the SDK's own unless there is one
 /// here or in an include folder.
 pub fn names(name: &str, options: &Options) -> Result<Vec<(String, i64)>> {
-    let mut asm = Assembler::new("".into(), options.include.clone());
+    let mut asm = Assembler::new("".into(), options);
     asm.path = asm.find("", name, true);
     asm.run()?;
     let fields: HashSet<&String> = asm.kinds.iter().filter(|(_, k)| **k == SymbolKind::Field).map(|(n, _)| n).collect();
@@ -293,13 +312,32 @@ pub(crate) struct Assembler {
     broken: HashSet<String>,
     spans: Vec<Span>,
     reserved: Vec<(i64, i64)>,
+    /// Options::sources, by absolute path.
+    sources: HashMap<PathBuf, String>,
+    /// For index(): where names are defined and used, in this pass and in
+    /// the one before, and whether this pass went to the end.
+    recording: bool,
+    record: Record,
+    last_record: Record,
+    pass_done: bool,
+    /// The line being assembled as an editor shows it: in an expansion,
+    /// the outermost call's. And as written: in an expansion, the macro's.
+    shown_at: Option<(Rc<str>, usize)>,
+    written_at: Option<(Rc<str>, usize)>,
 }
 
 impl Assembler {
-    fn new(path: Rc<str>, include: Vec<PathBuf>) -> Assembler {
+    fn new(path: Rc<str>, options: &Options) -> Assembler {
         Assembler {
             path,
-            include,
+            include: options.include.clone(),
+            sources: options.sources.iter().map(|(p, text)| (path::absolute(p), text.clone())).collect(),
+            recording: false,
+            record: Record::default(),
+            last_record: Record::default(),
+            pass_done: false,
+            shown_at: None,
+            written_at: None,
             symbols: BTreeMap::new(),
             kinds: HashMap::new(),
             last_pass: false,
@@ -392,6 +430,7 @@ impl Assembler {
             self.unresolved = true;
             return Ok(Some(0));
         }
+        self.note_use(&full);
         Ok(Some(self.symbols[&full]))
     }
 
@@ -441,6 +480,25 @@ impl Assembler {
         std::array::from_fn(|s| self.extents[s].unwrap_or((self.initial[s], self.initial[s])))
     }
 
+    /// The program assembled, from main file `path`.
+    fn program(self, path: &Path) -> Result<Program> {
+        let (Some((&first, _)), Some((&last, _))) = (self.out.first_key_value(), self.out.last_key_value()) else {
+            return Err(Error::new(format!("{}: no code", path.display())));
+        };
+        let load = self.org.unwrap_or(first);
+        let image = (load..=last).map(|a| self.out.get(&a).copied().unwrap_or(0)).collect();
+        Ok(Program {
+            load,
+            image,
+            symbols: self.symbols,
+            kinds: self.kinds,
+            listing: self.listing,
+            spans: self.spans,
+            reserved: self.reserved,
+            sizes: self.sizes,
+        })
+    }
+
     fn run(&mut self) -> Result<()> {
         for _ in 0..10 {
             self.last_pass = false;
@@ -478,6 +536,8 @@ impl Assembler {
     }
 
     fn pass(&mut self) -> Result<()> {
+        self.last_record = std::mem::take(&mut self.record);
+        self.pass_done = false;
         self.out.clear();
         self.listing.clear();
         self.org = None;
@@ -512,6 +572,7 @@ impl Assembler {
         self.kinds.retain(|name, _| defined.contains(name));
         let structs = &self.structs_defined;
         self.structs.retain(|name, _| structs.contains(name));
+        self.pass_done = true;
         Ok(())
     }
 
@@ -547,8 +608,9 @@ impl Assembler {
 
 
     fn source(&mut self, path: Rc<str>) -> Result<()> {
-        let text = match path.strip_prefix(PREFIX).and_then(header) {
-            Some(text) => text.to_string(),
+        let open = || self.sources.get(&path::absolute(Path::new(&*path))).cloned();
+        let text = match path.strip_prefix(PREFIX).and_then(header).map(str::to_string).or_else(open) {
+            Some(text) => text,
             None => {
                 let bytes = std::fs::read(&*path).map_err(|e| Error::new(format!("{}: {path}", path::strerror(&e))))?;
                 String::from_utf8(bytes).map_err(|_| Error::new(format!("not UTF-8: {path}")))?
@@ -589,23 +651,27 @@ impl Assembler {
                 Err(e) => return Err(e.at(&lines[i])),
             }
         }
-        match lines.last() {
-            Some(_) if !conds.is_empty() && !self.last_pass => {
+        match conds.last() {
+            Some(_) if !self.last_pass => {
                 self.unresolved = true;
                 Ok(())
             }
-            Some(line) if !conds.is_empty() => Err(Error::new(format!("{}: IF without ENDIF", path::shown(&line.path)))),
-            _ => Ok(()),
+            Some(&(_, open)) => Err(Error::new("IF without ENDIF").at(&lines[open])),
+            None => Ok(()),
         }
     }
 
     /// Assembles line `i` of `lines`, inside the IFs `conds`, each
-    /// (taking, taken, past its ELSE). Returns the line to go on with.
-    fn statement(&mut self, lines: &[Line], i: usize, conds: &mut Vec<[bool; 3]>) -> Result<usize> {
-        let active = conds.iter().all(|c| c[0]);
+    /// (taking, taken, past its ELSE) and the IF's line. Returns the line
+    /// to go on with.
+    fn statement(&mut self, lines: &[Line], i: usize, conds: &mut Vec<([bool; 3], usize)>) -> Result<usize> {
+        let written = (lines[i].path.clone(), lines[i].number);
+        self.shown_at = Some(self.call.clone().unwrap_or_else(|| written.clone()));
+        self.written_at = Some(written);
+        let active = conds.iter().all(|c| c.0[0]);
         // An ELSEIF is the IF's, and weighed if the IF around it is taking.
         let first = strip_comment(&lines[i].raw).split_whitespace().next().unwrap_or("").to_uppercase();
-        let outer = conds.len() <= 1 || conds[..conds.len() - 1].iter().all(|c| c[0]);
+        let outer = conds.len() <= 1 || conds[..conds.len() - 1].iter().all(|c| c.0[0]);
         let weighed = active || (first == "ELSEIF" && outer);
         let mut texts = if weighed && !self.texts.is_empty() { self.with_texts(&lines[i]) } else { None };
         // {text} joins a macro's argument to the names around it.
@@ -621,16 +687,16 @@ impl Assembler {
         let word = text.split_whitespace().next().unwrap_or("").to_uppercase();
         if word == "IF" {
             let taking = active && self.ev(after_chars(text, 2))? != 0;
-            conds.push([taking, taking || !active, false]);
+            conds.push(([taking, taking || !active, false], i));
         } else if word == "ELSEIF" {
-            let c = *conds.last().ok_or_else(|| Error::new("ELSEIF without IF"))?;
+            let c = conds.last().ok_or_else(|| Error::new("ELSEIF without IF"))?.0;
             if c[2] {
                 return Err(Error::new("ELSEIF after ELSE"));
             }
             let taking = !c[1] && self.ev(after_chars(text, 6))? != 0;
-            *conds.last_mut().expect("there") = [taking, c[1] || taking, false];
+            conds.last_mut().expect("there").0 = [taking, c[1] || taking, false];
         } else if word == "ELSE" {
-            let c = conds.last_mut().ok_or_else(|| Error::new("ELSE without IF"))?;
+            let c = &mut conds.last_mut().ok_or_else(|| Error::new("ELSE without IF"))?.0;
             if c[2] {
                 return Err(Error::new("ELSE twice"));
             }
@@ -664,6 +730,7 @@ impl Assembler {
             self.note(raw);
             let (name, frame) = include_operands(after_chars(text, 7))?;
             let path = self.find(&line.path, name, true);
+            self.note_include(&path, frame.as_ref().map(|f| f.prefix.as_str()));
             // The includer goes on in its own section, and its scope: the
             // file's labels are not its.
             let section = self.section;
@@ -749,6 +816,7 @@ impl Assembler {
                 return Err(Error::new(format!("{full} defined twice")));
             }
             let m = Macro::new(full.clone(), rest, lines[i + 1..end - 1].to_vec(), self.frames.clone())?;
+            self.note_definition(&full, NameKind::Macro);
             self.macros.insert(full, Rc::new(m));
             for l in &lines[i..end] {
                 self.note(&l.raw);
@@ -768,6 +836,7 @@ impl Assembler {
         if let Some(label) = label {
             self.define_label(label)?;
         }
+        self.note_use(&name);
         let m = self.macros[&name].clone();
         self.expand(&m, rest, line)?;
         Ok(Some(i + 1))
@@ -813,8 +882,7 @@ impl Assembler {
         // An error is shown at the outermost call, and where it is.
         match done {
             Err(e) if self.depth == 0 => {
-                let message = format!("{}:{}: in {}: {e}", path::shown(&call.path), call.number, m.name);
-                return Err(Error { message, located: true });
+                return Err(Error { place: Some((call.path.to_string(), call.number)), text: format!("in {}: {e}", m.name), raw: None });
             }
             Err(e) => return Err(e),
             Ok(()) => {}
@@ -852,11 +920,13 @@ impl Assembler {
     /// else, for an INCLUDE, the SDK's include file of that name. A file
     /// found nowhere is the one beside `from`, which then cannot be read.
     fn find(&self, from: &str, name: &str, headers: bool) -> Rc<str> {
+        // An editor's text is a file, saved or not; INCBIN reads the disk.
+        let there = |path: &Path| path.is_file() || headers && self.sources.contains_key(&path::absolute(path));
         let beside = path::beside(from, name);
-        if Path::new(&*beside).is_file() || Path::new(name).is_absolute() {
+        if there(Path::new(&*beside)) || Path::new(name).is_absolute() {
             return beside;
         }
-        if let Some(path) = self.include.iter().map(|dir| dir.join(name)).find(|path| path.is_file()) {
+        if let Some(path) = self.include.iter().map(|dir| dir.join(name)).find(|path| there(path)) {
             return path.to_string_lossy().into();
         }
         if headers && header(name).is_some() {
@@ -943,6 +1013,7 @@ impl Assembler {
         if self.defined.contains(&name) {
             // SET gives a name SET made a value again.
             if kind == SymbolKind::Set && was == Some(SymbolKind::Set) {
+                self.note_definition(&name, NameKind::Set);
                 self.symbols.insert(name, value);
                 return Ok(());
             }
@@ -954,6 +1025,13 @@ impl Assembler {
         if kind != SymbolKind::Set && self.last_pass && self.symbols.get(&name).is_some_and(|&v| v != value) {
             return Err(Error::new(format!("{name} never settles: its value depends on itself")));
         }
+        let noted = match kind {
+            SymbolKind::Label => NameKind::Label,
+            SymbolKind::Equ => NameKind::Equ,
+            SymbolKind::Set => NameKind::Set,
+            SymbolKind::Field => NameKind::Field,
+        };
+        self.note_definition(&name, noted);
         self.defined.insert(name.clone());
         self.symbols.insert(name, value);
         Ok(())
@@ -982,6 +1060,7 @@ impl Assembler {
             return Err(Error::new(format!("past FFFFh, the end of memory: {len} bytes at {start:04X}h")));
         }
         self.place(start, len);
+        self.note_placed(start, len, cycles);
         if self.section == BSS {
             if data.iter().any(|&b| b != 0) {
                 return Err(Error::new("BSS is reserved, not set: DS takes no fill there"));

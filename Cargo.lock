@@ -31,3 +31,16 @@ version = "0.3.0-dev"
 [[package]]
 name = "juku-i8080"
 version = "0.3.0-dev"
+
+[[package]]
+name = "juku-json"
+version = "0.3.0-dev"
+
+[[package]]
+name = "juku-lsp"
+version = "0.3.0-dev"
+dependencies = [
+ "juku-asm",
+ "juku-i8080",
+ "juku-json",
+]

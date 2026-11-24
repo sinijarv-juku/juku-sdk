@@ -1,0 +1,21 @@
+# juku-lsp, the language server for juku-asm's source: a command, and a
+# library. It speaks the Language Server Protocol on stdin and stdout, with
+# juku-json's JSON and framing, and assembles with juku-asm's library.
+# `juku-lsp --version` prints the SDK's version.
+
+[package]
+name = "juku-lsp"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The language server for Juku programs in juku-asm's 8080 assembler"
+
+[lib]
+name = "juku_lsp"
+
+[dependencies]
+juku-asm = { path = "../asm" }
+juku-i8080 = { path = "../i8080" }
+juku-json = { path = "../json" }

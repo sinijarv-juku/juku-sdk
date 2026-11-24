@@ -2,8 +2,13 @@
 
 Writing and debugging Juku programs in VS Code:
 
-- the language `juku-asm` for `.asm` files: juku-asm's syntax, colored,
-  and breakpoints;
+- the language `juku-asm` for `.asm` and `.inc` files: juku-asm's syntax,
+  colored, and breakpoints;
+- with the SDK's language server, `juku-lsp`: juku-asm's errors as the
+  source is typed, going to a name's definition and uses, hovers with
+  values and comments, the outline, completion, operands, renaming,
+  folding, and each line's address and cycles ([docs/lsp.md](../docs/lsp.md));
+- **Juku: Build**, which assembles the program being edited with `juku-asm`;
 - the debug type `juku`, which connects VS Code to the debug server of the
   Juku emulator, [juku-emu](https://github.com/sinijarv-juku/juku-emu) (its
   spec §12, in `docs/Emulator_spec.md`). The emulator speaks the Debug
@@ -42,9 +47,64 @@ app.
    another, such as `D:\juku-emu\target\windows\Juku.exe`. A Juku already
    running there takes the port from the new start, which then exits, so
    it need not have Accept Connections ticked.
-3. Pause stops the machine wherever it is. Where there is no source,
-   right-click a frame and choose Open Disassembly View to step by
-   instruction. Registers are under Variables and can be changed.
+3. Pause stops the machine wherever it is. When it stops where there is no
+   source, as a Step Into a RomBios routine (`call rb.tto`) does, the
+   extension shows the frame the CPU is in, in the Disassembly view, where
+   steps go by instruction; a `ret` back into the program's code shows its
+   source again, and a click in the editor steps by line there. VS Code by
+   itself would show the call's line, the nearest frame with source, while
+   the CPU runs on elsewhere. Another frame can be picked in Call Stack, and
+   any one opened with right-click, Open Disassembly View. Registers are
+   under Variables and can be changed.
+
+## The language server
+
+The extension starts `juku-lsp` for `.asm` and `.inc` files: the one the
+`juku.lsp.path` setting names, else the one on the PATH, else the one in
+cargo's bin folder, where the SDK's `./build.sh install` (or `build.cmd
+install`) puts it. Without it, the files are colored and nothing more,
+and the extension says so once.
+
+| Setting | |
+|---|---|
+| `juku.mainFiles` | The main files to assemble, absolute or from the workspace folder. By default each `.asm` file no other file includes |
+| `juku.includePaths` | The folders `include` and `incbin` look in, as `juku-asm -I` |
+| `juku.inlayHints` | Each line's address, and its cycles or bytes, after it. Off by default |
+| `juku.lsp.enabled` | `false` runs no language server |
+| `juku.lsp.path` | The `juku-lsp` program |
+
+**Juku: Restart Language Server** in the Command Palette starts it again,
+as does changing a `juku.lsp` setting. A server that stops by itself is
+started again, up to three times in three minutes; what it writes goes to
+the Juku Language Server output.
+
+The client is written in `lsp.js` and `rpc.js`, without the
+`vscode-languageclient` package, so that the extension needs no npm.
+
+## Building
+
+**Juku: Build** (Ctrl+Shift+B, ⇧⌘B on macOS), with a `juku-asm` file
+being edited, saves
+the files and assembles the program the file is in: its main file, which
+the language server knows (a file included by another is built by building
+that one), or the file itself if it is an `.asm` file in no other's
+program. It runs `juku-asm -g` in the main file's folder, so the image
+(`.bin`) and the debug information (`.dbg`) are written beside it; the
+status bar says how many bytes at what address. An error is shown, and the
+Juku Build output has all `juku-asm` wrote. The shortcut is VS Code's Run
+Build Task elsewhere, and in `juku-asm` files while not debugging is Juku:
+Build; Terminal → Run Build Task still runs a `tasks.json` build, and the
+Keyboard Shortcuts editor can give Juku: Build another key.
+
+| Setting | |
+|---|---|
+| `juku.build.arguments` | What `juku-asm` is given before the include folders (`juku.includePaths`) and the main file: `["-g"]` by default; `-l` adds a listing with cycle counts, `-s` the symbols |
+| `juku.asm.path` | The `juku-asm` program: by default the one on the PATH, or in cargo's bin folder |
+
+To build a `.COM` file, name the image with `-o`, in the main file's
+folder: `"juku.build.arguments": ["-g", "-o", "game.com"]` writes
+`game.com` and `game.dbg`. `-o` names the image of every program built,
+so this is for a workspace with one main file.
 
 ## Launching a program
 

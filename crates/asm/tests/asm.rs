@@ -7,7 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
-use juku_asm::{HEADERS, Options, Program, assemble, assemble_with};
+use juku_asm::{HEADERS, Index, NameKind, Options, Program, assemble, assemble_with};
 
 const DEMOS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/demos");
 
@@ -811,7 +811,7 @@ fn include_folders() {
             ("inc2/data.bin", "\u{5}"),
         ],
     );
-    let options = Options { include: vec![dir.join("inc1"), dir.join("inc2")] };
+    let options = Options { include: vec![dir.join("inc1"), dir.join("inc2")], ..Options::default() };
     let program = assemble_with(&dir.join("src/p.asm"), &options).unwrap();
     assert_eq!(program.image, [1, 2, 3, 4, 5]);
 
@@ -871,7 +871,10 @@ fn errors() {
     // A name defined only in an early pass is not defined.
     let e = error("stale", "        org 100h\n        if FLAG == 0\nfoo:    nop\n        endif\n        lxi h, foo\nFLAG    equ 1\n");
     assert_eq!(e, "p.asm:5: undefined symbol foo\n          lxi h, foo");
-    assert_eq!(error("if", "        if 1\n        nop\n"), "p.asm: IF without ENDIF");
+    // The IF that is not closed: the innermost one left open.
+    assert_eq!(error("if", "        if 1\n        nop\n"), "p.asm:1: IF without ENDIF\n          if 1");
+    let e = error("if_inner", "        if 1\n        if 0\n        endif\n        if 2\n        nop\n");
+    assert_eq!(e, "p.asm:4: IF without ENDIF\n          if 2");
     assert_eq!(error("elseif", "        elseif 1\n"), "p.asm:1: ELSEIF without IF\n          elseif 1");
     let e = error("elseif_else", "        if 1\n        else\n        elseif 1\n        endif\n");
     assert_eq!(e, "p.asm:3: ELSEIF after ELSE\n          elseif 1");
@@ -897,4 +900,140 @@ fn errors() {
     let dir = write("included", &[("p.asm", "        nop\n        include 'sub/q.asm'\n"), ("sub/q.asm", "        nop\n        foo\n")]);
     let e = assemble(&dir.join("p.asm")).err().unwrap().to_string().replace('\\', "/");
     assert!(e.ends_with("included/sub/q.asm:2: unknown mnemonic FOO\n          foo"), "{e}");
+}
+
+/// The lines that define `name` in `index`, as (kind, file's name, line).
+fn defined(index: &Index, name: &str) -> Vec<(NameKind, String, usize)> {
+    let file = |f: &str| Path::new(f).file_name().unwrap().to_string_lossy().into_owned();
+    index.definitions.iter().filter(|d| d.name == name).map(|d| (d.kind, file(&d.file), d.line)).collect()
+}
+
+/// The lines of `file` that use `name` in `index`.
+fn used(index: &Index, name: &str, file: &str) -> Vec<usize> {
+    let mut lines: Vec<usize> = index.uses.iter().filter(|u| u.name == name && u.file.ends_with(file)).map(|u| u.line).collect();
+    lines.sort();
+    lines
+}
+
+#[test]
+fn index_of_names() {
+    let main = "        include 'rombios.inc' as rb
+        include 'lib.asm'
+COUNT   equ 3
+n       set 1
+n       set n + 1
+point   struct
+x       db 0
+y       db 0
+        ends
+twice   macro what
+        call what
+        call rb.tto
+        endm
+        org 100h
+main:   mvi a, COUNT
+.loop:  dcr a
+        jnz .loop
+        twice helper
+        twice .loop
+        rept 2
+        call helper
+        endm
+        lxi h, here.y
+        db size(point), n
+here    point
+";
+    let dir = write("index", &[("p.asm", main), ("lib.asm", "helper: ret\n")]);
+    let index = juku_asm::index(&dir.join("p.asm"), &Options::default());
+    let program = index.program.as_ref().unwrap();
+    assert_eq!(program.symbols(), assemble(&dir.join("p.asm")).unwrap().symbols());
+
+    use NameKind::*;
+    let p = |line| ("p.asm".to_string(), line);
+    let with = |kind, (file, line): (String, usize)| vec![(kind, file, line)];
+    assert_eq!(defined(&index, "COUNT"), with(Equ, p(3)));
+    assert_eq!(defined(&index, "n"), vec![(Set, "p.asm".into(), 4), (Set, "p.asm".into(), 5)]);
+    assert_eq!(defined(&index, "point"), with(Struct, p(6)));
+    assert_eq!(defined(&index, "point.y"), with(Field, p(8)), "a field on its own line");
+    assert_eq!(defined(&index, "twice"), with(Macro, p(10)));
+    assert_eq!(defined(&index, "main.loop"), with(Label, p(16)));
+    assert_eq!(defined(&index, "here"), with(Label, p(25)));
+    assert_eq!(defined(&index, "here.y"), with(Label, p(25)), "an instance's fields on its line");
+    assert_eq!(defined(&index, "helper"), with(Label, ("lib.asm".into(), 1)));
+    assert_eq!(defined(&index, "rb.tto"), with(Equ, ("rombios.inc".into(), 20)));
+    let tto = index.definitions.iter().find(|d| d.name == "rb.tto").unwrap();
+    assert_eq!(tto.file, format!("{}rombios.inc", juku_asm::HEADER_PREFIX), "a built-in file");
+    let value = |name: &str| index.definitions.iter().find(|d| d.name == name).unwrap().value;
+    assert_eq!((value("main.loop"), value("n"), value("point"), value("twice")), (Some(0x102), Some(2), Some(2), None));
+
+    assert_eq!(used(&index, "COUNT", "p.asm"), [15]);
+    assert_eq!(used(&index, "main.loop", "p.asm"), [11, 17, 19], "in the macro, on its line and the call's");
+    assert_eq!(used(&index, "helper", "p.asm"), [11, 18, 21], "once for both of REPT's times");
+    assert_eq!(used(&index, "rb.tto", "p.asm"), [12, 18, 19]);
+    assert_eq!(used(&index, "twice", "p.asm"), [18, 19]);
+    assert_eq!(used(&index, "point", "p.asm"), [24, 25]);
+    assert_eq!(used(&index, "here.y", "p.asm"), [23]);
+    assert_eq!(used(&index, "n", "p.asm"), [5, 24]);
+
+    let includes: Vec<_> = index.includes.iter().map(|i| (i.line, i.path.rsplit(['/', '\\']).next().unwrap().to_string(), i.namespace.clone())).collect();
+    assert_eq!(includes, [(1, "rombios.inc".into(), Some("rb".into())), (2, "lib.asm".into(), None)]);
+    assert!(index.definitions.iter().all(|d| !d.name.contains('#')), "no expansion's own labels");
+}
+
+/// With an error, the names are still all there: those below it too.
+#[test]
+fn index_with_an_error() {
+    let dir = write("index_error", &[("p.asm", "        org 100h\nstart:  jmp later\n        foo\nlater:  call start\n")]);
+    let index = juku_asm::index(&dir.join("p.asm"), &Options::default());
+    let e = index.program.as_ref().err().unwrap();
+    assert_eq!((e.place().map(|(f, l)| (f.ends_with("p.asm"), l)), e.message()), (Some((true, 3)), "unknown mnemonic FOO"));
+    assert_eq!(defined(&index, "later"), vec![(NameKind::Label, "p.asm".into(), 4)]);
+    assert_eq!(used(&index, "start", "p.asm"), [4]);
+    assert_eq!(used(&index, "later", "p.asm"), [2]);
+
+    // In a macro, the error is at the call, and says where in the macro.
+    let dir = write("index_error_macro", &[("p.asm", "m       macro\n        foo\n        endm\n        nop\n        m\n")]);
+    let e = juku_asm::index(&dir.join("p.asm"), &Options::default()).program.err().unwrap();
+    assert_eq!(e.place().map(|(_, l)| l), Some(5));
+    assert!(e.message().starts_with("in m: ") && e.message().contains("p.asm:2: unknown mnemonic FOO"), "{}", e.message());
+    // One in no line.
+    let dir = write("index_error_none", &[("p.asm", "; nothing\n")]);
+    let e = juku_asm::index(&dir.join("p.asm"), &Options::default()).program.err().unwrap();
+    assert_eq!(e.place(), None);
+}
+
+/// An editor's text is taken in place of the file's, and is a file to
+/// include though it is not saved.
+#[test]
+fn sources() {
+    let dir = write("sources", &[("p.asm", "        nop\n")]);
+    let mut options = Options::default();
+    options.sources.insert(dir.join("p.asm"), "        include 'new.asm'\n        mvi a, 1\n".into());
+    options.sources.insert(dir.join("sub/../new.asm"), "        mvi a, 2\n".into());
+    assert_eq!(assemble_with(&dir.join("p.asm"), &options).unwrap().image, [0x3E, 2, 0x3E, 1]);
+    assert_eq!(juku_asm::index(&dir.join("p.asm"), &options).includes.len(), 1);
+    assert_eq!(assemble(&dir.join("p.asm")).unwrap().image, [0], "the disk's own");
+}
+
+/// What each line places: in a macro's call its expansion's, in a REPT
+/// every time's.
+#[test]
+fn index_of_placed() {
+    let source = "two     macro
+        nop
+        mvi a, 1
+        endm
+        org 100h
+        two
+        rept 3
+        inx h
+        endm
+        db 1, 2
+        bss
+buf     ds 4
+";
+    let dir = write("index_placed", &[("p.asm", source)]);
+    let index = juku_asm::index(&dir.join("p.asm"), &Options::default());
+    let placed: Vec<_> = index.placed.iter().map(|p| (p.line, p.address, p.size, p.cycles)).collect();
+    assert_eq!(placed, [(6, 0x100, 3, Some(11)), (8, 0x103, 3, Some(15)), (10, 0x106, 2, None), (12, 0x108, 4, None)]);
 }

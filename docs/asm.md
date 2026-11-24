@@ -24,7 +24,13 @@ juku-asm --version
   and nothing is written.
 
 It is a command and a library (`juku_asm::assemble`, and `assemble_with`
-for include folders), in `crates/asm`.
+for include folders and for source text an editor has not saved), in
+`crates/asm`. An error names its file and line apart from what is wrong
+(`Error::place`, `Error::message`). For an editor, `juku_asm::index`
+assembles a program and lists where each name is defined and used, what
+each `include` includes, and what each line places in memory, at what
+address and in how many cycles; with an error it still lists the names of the
+whole source, as the lines without errors define and use them.
 `crates/asm/tests/demos/` has example programs, which `cargo test`
 assembles and compares with the outputs beside them.
 

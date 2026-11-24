@@ -12,7 +12,7 @@ pub const HEADERS: [(&str, &str); 4] = [
 
 /// What a built-in include file's path starts with, in messages and the
 /// listing: `<juku-sdk>/rombios.inc`.
-pub(crate) const PREFIX: &str = "<juku-sdk>/";
+pub const PREFIX: &str = "<juku-sdk>/";
 
 /// The built-in include file `name`'s text.
 pub fn header(name: &str) -> Option<&'static str> {

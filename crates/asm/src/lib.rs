@@ -68,6 +68,11 @@
 //! debugger needs (the SDK's docs/asm.md, Outputs): the load address, the
 //! source files, where each line's instructions and data are, and the
 //! symbols.
+//!
+//! For an editor, [`index`] also lists where each name is defined and used.
+//! It records them in every pass, and with an error takes the pass before
+//! the last, which went past each line with one, so the names below the
+//! error are there too.
 
 mod asm;
 mod encode;
@@ -77,5 +82,5 @@ mod macros;
 mod output;
 mod path;
 
-pub use asm::{Error, Options, Program, assemble, assemble_with, names};
-pub use headers::{HEADERS, header};
+pub use asm::{Definition, Error, Include, Index, NameKind, Options, Placed, Program, Use, assemble, assemble_with, index, names};
+pub use headers::{HEADERS, PREFIX as HEADER_PREFIX, header};

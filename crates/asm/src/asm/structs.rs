@@ -3,7 +3,7 @@
 
 use std::rc::Rc;
 
-use super::{Assembler, BSS, DIRECTIVES, Error, Line, Result, SymbolKind, head, is_name, memory, split_operands, string_bytes, strip_comment};
+use super::{Assembler, BSS, DIRECTIVES, Error, Line, NameKind, Result, SymbolKind, head, is_name, memory, split_operands, string_bytes, strip_comment};
 use crate::{encode, macros};
 
 /// A struct: its fields in order, and their bytes when no value is given.
@@ -33,6 +33,8 @@ struct Field {
     word: bool,
     /// A field that is a struct, whose value is a list.
     inner: Option<Rc<Struct>>,
+    /// Its line: where an editor finds its name defined.
+    at: (Rc<str>, usize),
 }
 
 impl Assembler {
@@ -64,7 +66,11 @@ impl Assembler {
         }
         // An error is its field's line's; before the last pass the struct
         // is left as it was, and the lines after it go on.
-        match self.fields(&full, union, rest, &lines[i + 1..end]) {
+        self.note_definition(&full, if union { NameKind::Union } else { NameKind::Struct });
+        let at = self.shown_at.clone();
+        let fields = self.fields(&full, union, rest, &lines[i + 1..end]);
+        (self.shown_at, self.written_at) = (at.clone(), at);
+        match fields {
             Ok(s) => {
                 self.name_fields(&full, &s, 0, SymbolKind::Field)?;
                 self.broken.remove(&full);
@@ -85,6 +91,7 @@ impl Assembler {
         let mut s = Struct { name: name.to_string(), fields: Vec::new(), default: Vec::new(), union };
         for l in lines {
             self.at = Some((l.path.clone(), l.number));
+            (self.shown_at, self.written_at) = (self.at.clone(), self.at.clone());
             self.field(&mut s, l).map_err(|e| e.at(l))?;
         }
         if !size.is_empty() {
@@ -151,6 +158,7 @@ impl Assembler {
             }
             _ => {
                 let t = self.find_struct(word).ok_or_else(|| Error::new(format!("a field is DB, DW, DS or a struct: {word}")))?;
+                self.note_use(&t.name);
                 let bytes = self.values(&t, t.default.clone(), ops)?;
                 inner = Some(t);
                 bytes
@@ -159,7 +167,8 @@ impl Assembler {
         // A union's fields all start at 0, and where they overlap its bytes
         // are the first one's.
         let offset = if s.union { 0 } else { s.default.len() };
-        s.fields.push(Field { name, offset, size: bytes.len(), pad, word: word_field, inner });
+        let at = (l.path.clone(), l.number);
+        s.fields.push(Field { name, offset, size: bytes.len(), pad, word: word_field, inner, at });
         if offset + bytes.len() > s.default.len() {
             s.default.extend(&bytes[s.default.len() - offset..]);
         }
@@ -174,7 +183,15 @@ impl Assembler {
             let Some(name) = &f.name else { continue };
             let full = format!("{prefix}.{name}");
             let at = base + f.offset as i64;
-            self.define(full.clone(), at, kind)?;
+            // A struct's field is defined on its line; a label's, on the
+            // label's.
+            let line = self.shown_at.clone();
+            if kind == SymbolKind::Field {
+                self.shown_at = Some(f.at.clone());
+            }
+            let defined = self.define(full.clone(), at, kind);
+            self.shown_at = line;
+            defined?;
             if kind == SymbolKind::Label {
                 self.sizes.insert(full.clone(), f.size as i64);
             }
@@ -195,7 +212,10 @@ impl Assembler {
     pub fn struct_size(&mut self, name: &str) -> Result<i64> {
         match self.find_struct(name) {
             Some(s) if self.strict && !self.structs_defined.contains(&s.name) => Err(Error::new("not known yet")),
-            Some(s) => Ok(s.size()),
+            Some(s) => {
+                self.note_use(&s.name);
+                Ok(s.size())
+            }
             None if self.last_pass => Err(Error::new(format!("size() takes a section (code, const, data, bss) or a struct: {name}"))),
             None => {
                 self.unresolved = true;
@@ -213,6 +233,7 @@ impl Assembler {
     /// address; `label` is the full name of the line's label, which names
     /// the fields under it. In BSS it only reserves.
     pub(super) fn instance(&mut self, label: Option<String>, s: &Struct, operands: &str, raw: &str) -> Result<()> {
+        self.note_use(&s.name);
         if let Some(label) = label {
             self.sizes.insert(label.clone(), s.size());
             self.name_fields(&label, s, self.here, SymbolKind::Label)?;

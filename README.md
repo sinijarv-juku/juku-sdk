@@ -8,12 +8,14 @@ computer of the late 1980s, in Intel 8080 assembler.
 | `juku-asm` | the assembler: image, listing, symbols, debug information | [docs/asm.md](docs/asm.md) |
 | `juku-disk` | files on EKDOS disk images: list, copy off, put on, remove; blank disks | [docs/disk.md](docs/disk.md) |
 | `juku-dis` | the disassembler: a listing, or source that assembles back to the same bytes | [docs/dis.md](docs/dis.md) |
+| `juku-lsp` | the language server: `juku-asm`'s errors in an editor as the source is typed | [docs/lsp.md](docs/lsp.md) |
 
 The debug information is what the Juku emulator's debugger, in
 [juku-emu](https://github.com/sinijarv-juku/juku-emu), loads to debug a
 program from its source in VS Code, with the SDK's VS Code extension in
-`vscode/`: the language `juku-asm` for `.asm` files, and the debug type
-`juku`, which connects to the emulator ([vscode/README.md](vscode/README.md)).
+`vscode/`: the language `juku-asm` for `.asm` files, with `juku-lsp` behind
+it, and the debug type `juku`, which connects to the emulator
+([vscode/README.md](vscode/README.md)).
 
 `demos/` has demo programs written with the SDK, raster effects for the
 expansion ROM window ([demos/README.md](demos/README.md)).
@@ -78,7 +80,10 @@ Each tool is a crate in `crates/<name>`: the library `juku_<name>` and the
 command `juku-<name>`. `crates/i8080`, a library only, is the 8080's
 instruction set as a table, which the assembler and the disassembler share.
 `crates/demos`, a library only, holds the demos' sources and images for
-other programs' tests. They have no dependencies but each other.
+other programs' tests. `crates/json`, a library only, is JSON and the
+`Content-Length` framing of the Debug Adapter Protocol and the Language
+Server Protocol, which juku-emu's debug server uses. They have no
+dependencies but each other.
 
 ## Versions
 

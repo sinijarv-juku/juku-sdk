@@ -1,0 +1,15 @@
+# juku-json, JSON and the Content-Length framing that DAP and LSP share: for
+# juku-emu's debug server and the SDK's language server. A library only. No
+# dependencies, and no format!: juku-emu's app links it (src/lib.rs).
+
+[package]
+name = "juku-json"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "JSON values and Content-Length framing for the Juku debug and language servers"
+
+[lib]
+name = "juku_json"

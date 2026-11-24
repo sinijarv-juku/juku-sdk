@@ -1,7 +1,7 @@
 {
     "name": "juku",
     "displayName": "Juku",
-    "description": "Juku E5101/E5104 programs in juku-asm's 8080 assembler: the language, and debugging them on the Juku emulator over DAP: launch them, step by line or instruction, breakpoints, registers, memory.",
+    "description": "Juku E5101/E5104 programs in juku-asm's 8080 assembler: the language, with juku-asm's errors as you type, going to names, completion and renaming through the SDK's language server, and debugging them on the Juku emulator over DAP: launch them, step by line or instruction, breakpoints, registers, memory.",
     "version": "0.0.0",
     "publisher": "sinijarv-juku",
     "license": "MIT",
@@ -22,7 +22,8 @@
     ],
     "main": "./extension.js",
     "activationEvents": [
-        "onDebug"
+        "onDebug",
+        "onLanguage:juku-asm"
     ],
     "contributes": {
         "configuration": {
@@ -37,9 +38,83 @@
                     "type": "string",
                     "default": "Juku",
                     "description": "The Juku app the debugger starts when nothing listens on the port: on macOS a name it knows (open -a) or the path of the .app; on Windows the path of Juku.exe. On Windows the default looks where the installer puts Juku, then on the PATH."
+                },
+                "juku.lsp.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run juku-lsp, the SDK's language server, for .asm and .inc files: juku-asm's errors as you type, going to names, hovers, completion, renaming."
+                },
+                "juku.lsp.path": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The juku-lsp program. By default the one on the PATH, or in cargo's bin folder, where the SDK's build.sh install puts it."
+                },
+                "juku.mainFiles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "The main files the language server assembles, absolute or from the workspace folder. By default each .asm file that no other file includes."
+                },
+                "juku.includePaths": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "The folders include and incbin look in, as juku-asm's -I: absolute or from the workspace folder."
+                },
+                "juku.inlayHints": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show each line's address, and its instructions' cycles or its bytes, after it."
+                },
+                "juku.asm.path": {
+                    "type": "string",
+                    "default": "",
+                    "description": "The juku-asm program Juku: Build runs. By default the one on the PATH, or in cargo's bin folder, where the SDK's build.sh install puts it."
+                },
+                "juku.build.arguments": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "-g"
+                    ],
+                    "description": "What Juku: Build gives juku-asm before the include folders and the main file: -g writes the debug information (.dbg), -l a listing with cycle counts (.lst), -s the symbols (.sym)."
                 }
             }
         },
+        "commands": [
+            {
+                "command": "juku.build",
+                "title": "Build",
+                "category": "Juku"
+            },
+            {
+                "command": "juku.restartLanguageServer",
+                "title": "Restart Language Server",
+                "category": "Juku"
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "juku.build",
+                    "when": "editorLangId == juku-asm"
+                }
+            ]
+        },
+        "keybindings": [
+            {
+                "command": "juku.build",
+                "key": "ctrl+shift+b",
+                "mac": "cmd+shift+b",
+                "when": "editorLangId == juku-asm && !inDebugMode"
+            }
+        ],
         "debuggers": [
             {
                 "type": "juku",
@@ -200,7 +275,8 @@
                     "juku-asm"
                 ],
                 "extensions": [
-                    ".asm"
+                    ".asm",
+                    ".inc"
                 ],
                 "configuration": "./language-configuration.json"
             }
