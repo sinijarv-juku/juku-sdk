@@ -155,3 +155,5 @@ python3 vscode/package.py && code --install-extension target/juku.vsix   # the V
   test`, imperative, under 72 characters; a body only when something is not
   obvious; no AI attribution. The scope is the crate (`asm`, `disk`) where
   there is one.
+- **Branches** are named `type/name`, the type being the commit type of the
+  branch's main change: `feat/asm-macros`, `fix/disk-skew`.
