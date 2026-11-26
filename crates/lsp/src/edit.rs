@@ -48,8 +48,8 @@ enum Role<'t> {
 /// the head word of the line ends.
 fn role(line: &str, start: usize) -> (Role<'_>, usize) {
     let words: Vec<(usize, usize)> = text::words(line).into_iter().filter(|w| w.0 == Word::Name).map(|(_, s, e)| (s, e)).collect();
-    // A label in the first column, or `:`, comes before the head word.
-    let labelled = line.starts_with(|c: char| !c.is_whitespace() && c != ':') && words.first().is_some_and(|w| w.0 == 0);
+    // A label in the first column, `@:` too, comes before the head word.
+    let labelled = line.starts_with(|c: char| !c.is_whitespace()) && words.first().is_some_and(|w| w.0 == 0);
     let head = if labelled { words.get(1) } else { words.first() };
     if start == 0 && labelled {
         return (Role::Label, 0);
@@ -61,11 +61,12 @@ fn role(line: &str, start: usize) -> (Role<'_>, usize) {
 }
 
 /// `name` is one a renamed name can be: no mnemonic, directive or
-/// register, and no dot. A function is one only when called.
+/// register, no dot, and not `@` alone. A function is one only when called.
 fn is_new_name(name: &str) -> bool {
     let mut chars = name.chars();
     let lower = name.to_lowercase();
-    chars.next().is_some_and(|c| c.is_ascii_alphabetic() || "_?@".contains(c))
+    name != "@"
+        && chars.next().is_some_and(|c| c.is_ascii_alphabetic() || "_?@".contains(c))
         && chars.all(|c| c.is_alphanumeric() || "_?@".contains(c))
         && !OPS.iter().any(|op| op.mnemonic.eq_ignore_ascii_case(name))
         && ![&DIRECTIVES[..], &REGISTERS[..]].iter().any(|list| list.contains(&lower.as_str()))
@@ -373,7 +374,7 @@ impl Query<'_> {
         self.renamable(&name, &mains)?;
         let new = params["newName"].as_str().unwrap_or("").trim().trim_start_matches('.');
         if !is_new_name(new) {
-            return failed(format!("{new} cannot be a name: a letter, _, ? or @, then those or digits, and no mnemonic, directive or register"));
+            return failed(format!("{new} cannot be a name: a letter, _, ? or @, then those or digits, but not @ alone, and no mnemonic, directive or register"));
         }
         let old = name.rsplit('.').next().unwrap_or(&name).to_string();
         let renamed = format!("{}{new}", &name[..name.len() - old.len()]);

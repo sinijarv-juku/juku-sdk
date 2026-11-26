@@ -43,8 +43,8 @@
 //! A label starting with a dot is local: `.loop` after `draw:` is
 //! `draw.loop`, and can be named that way from elsewhere.
 //!
-//! A colon alone in the first column is an anonymous label: `:-` is the last
-//! one up to the line, `:+` the next one after it, `:--` and `:++` one
+//! `@:` in the first column is an anonymous label: `@-` is the last
+//! one up to the line, `@+` the next one after it, `@--` and `@++` one
 //! further. A reference reaches only those in its file and in the scope of
 //! its label.
 //!

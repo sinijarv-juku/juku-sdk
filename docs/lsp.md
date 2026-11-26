@@ -77,7 +77,7 @@ changed is assembled again before a question about it is answered.
   namespace shows its names as it writes them. **The workspace's symbols**
   are every name the programs define, by full name.
 
-Anonymous labels (`:-`, `:+`) and names `set` gives a string or a list
+Anonymous labels (`@-`, `@+`) and names `set` gives a string or a list
 are not names here.
 
 ## Writing

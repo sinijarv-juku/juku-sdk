@@ -125,7 +125,7 @@ python3 vscode/package.py && code --install-extension target/juku.vsix   # the V
   The include files keep to this. Source here includes `rombios.inc` as
   `rb`, `ekdos.inc` as `dos` and `ports.inc` as `io` (`call rb.tto`, `call
   dos.bdos`, `out io.t2_1`), and so does what `juku-dis -s` writes. An
-  anonymous label (`:`, `jnz :-`) only where a name would be noise, one
+  anonymous label (`@:`, `jnz @-`) only where a name would be noise, one
   that would have to be made up (`.ok`, `.wait2` beside `.wait`). Names are
   case-sensitive; mnemonics, registers and directives are not.
 - **Versions**: one for the SDK, semantic, in the workspace's `Cargo.toml`

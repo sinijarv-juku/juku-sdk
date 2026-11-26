@@ -549,6 +549,7 @@ fn rename() {
     let (code, message) = failure(rename(&mut server, 8, 15, "out"));
     assert_eq!((code, message.as_str()), (Some(-32803), "rb.tto is the SDK's: its include files are not changed"));
     assert!(failure(rename(&mut server, 7, 2, "mov")).1.contains("cannot be a name"));
+    assert!(failure(rename(&mut server, 7, 2, "@")).1.contains("cannot be a name"));
     assert_eq!(failure(rename(&mut server, 7, 2, "COUNT")).1, "COUNT is defined already");
     assert!(failure(rename(&mut server, 19, 0, "y")).1.starts_with("point.x is a field"));
 }

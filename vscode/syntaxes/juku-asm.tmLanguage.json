@@ -2,7 +2,7 @@
     "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
     "name": "Juku 8080 Assembler",
     "scopeName": "source.juku-asm",
-    "comment": "The syntax of juku-asm: Intel 8080 mnemonics, its directives, labels with a colon or in the first column, anonymous labels (: and :- :+), numbers as 123, 0FFh, 1010b, 'c'.",
+    "comment": "The syntax of juku-asm: Intel 8080 mnemonics, its directives, labels with a colon or in the first column, anonymous labels (@: and @- @+), numbers as 123, 0FFh, 1010b, 'c'.",
     "patterns": [
         {
             "include": "#comment"
@@ -43,7 +43,8 @@
         "label": {
             "patterns": [
                 {
-                    "match": "^\\s*([A-Za-z_?@.][\\w?@.]*):",
+                    "comment": "An anonymous label: @: in the first column.",
+                    "match": "^(@):(?=\\s|$)",
                     "captures": {
                         "1": {
                             "name": "entity.name.function.label.juku-asm"
@@ -51,8 +52,7 @@
                     }
                 },
                 {
-                    "comment": "An anonymous label: a colon alone in the first column.",
-                    "match": "^(:)(?=\\s|$)",
+                    "match": "^\\s*([A-Za-z_?@.][\\w?@.]*):",
                     "captures": {
                         "1": {
                             "name": "entity.name.function.label.juku-asm"
@@ -103,9 +103,9 @@
             "match": "(?i)\\b(?:HIGH|LOW|START|END|SIZE|SAME|REG|PAIR|CONST|BLANK|COUNT|DEFINED|REVERSE|CSTR|UPPER|LOWER)(?=\\s*\\()"
         },
         "anonymous": {
-            "comment": "A reference to an anonymous label: :- :-- :+ :++.",
+            "comment": "A reference to an anonymous label: @- @-- @+ @++.",
             "name": "variable.other.label.juku-asm",
-            "match": ":(?:-+|\\++)"
+            "match": "(?<![\\w?@.])@(?:-+|\\++)"
         },
         "number": {
             "name": "constant.numeric.juku-asm",

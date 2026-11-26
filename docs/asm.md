@@ -59,20 +59,20 @@ greeting:
 - A label starting with a dot is local: `.next` after `main:` is
   `main.next`, and can be named that way from elsewhere. `equ` does not
   start a scope.
-- A colon alone in the first column is an anonymous label. `:-` is the
-  last one before the line, or on it, and `:+` the next one after it; each
-  sign more goes one further (`:--`, `:++`). A reference reaches only those
+- `@:` in the first column is an anonymous label. `@-` is the last one
+  before the line, or on it, and `@+` the next one after it; each sign
+  more goes one further (`@--`, `@++`). A reference reaches only those
   of its own scope, up to the labels not starting with a dot on either side,
   and of its own file. They are not symbols, start no scope, and in a
   `rept` body each time round has its own:
 
   ```asm
   count:  mvi b, 8                ; the bits set in A, into C
-  :       rlc
-          jnc :+
+  @:      rlc
+          jnc @+
           inr c
-  :       dcr b
-          jnz :--
+  @:      dcr b
+          jnz @--
           ret
   ```
 - Numbers: `123`, `0ffh`, `1010b`, `12d`, `'c'`. Expressions use `+ - * / %
@@ -313,7 +313,7 @@ main:   pushr b, d, h
   outside quotes. An argument means what it would on the line that uses
   the macro: `.done` is the caller's local label, and `foo` the caller's
   `foo` even in a macro whose own file has a `foo`; the listing shows that
-  one as `^foo`. `:+` and `:-` cannot be arguments.
+  one as `^foo`. `@+` and `@-` cannot be arguments.
 - `{name}` joins a parameter's text to what is around it, and
   `{upper(name)}` and `{lower(name)}` change its case first:
 

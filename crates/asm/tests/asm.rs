@@ -284,8 +284,8 @@ wait    macro n
         jnz .loop
         endm
 skip    macro
-:       nop
-        jmp :-
+@:      nop
+        jmp @-
         endm
         org 100h
 main:   pushr b, d, h
@@ -294,9 +294,9 @@ main:   pushr b, d, h
         mov a, a
         wait flag
         wait .x
-        jmp :+
+        jmp @+
         skip
-:       popr b, d, h
+@:      popr b, d, h
 .x:     db 0
 flag:   db 0
 ";
@@ -375,7 +375,7 @@ flag:   db 0
         ("m       macro\n        endm\nm       macro\n        endm\n", "p.asm:3: m defined twice\n  m       macro"),
         ("        for x\n        endm\n", "p.asm:1: FOR takes a name and a list\n          for x"),
         ("        for x, 1\n        nop\n", "p.asm:1: FOR without ENDM\n          for x, 1"),
-        ("m       macro x\n        jmp x\n        endm\n:       m :-\n", "p.asm:4: an anonymous label cannot be a macro's argument\n  :       m :-"),
+        ("m       macro x\n        jmp x\n        endm\n@:      m @-\n", "p.asm:4: an anonymous label cannot be a macro's argument\n  @:      m @-"),
         ("r       macro\n        r\n        endm\n        r\n", "p.asm:4: in r: p.asm:2: macros nested more than 64 deep\n          r"),
         ("g       macro\nhere:   nop\n        endm\n        g\n        g\n", "p.asm:5: in g: p.asm:2: here defined twice\n  here:   nop"),
         ("        opt maybe\n", "p.asm:1: OPT takes ON or OFF\n          opt maybe"),
@@ -754,23 +754,23 @@ after:  nop
     assert_eq!(e, "p.asm:1: size() takes a section (code, const, data, bss) or a struct: text\n          dw size(text)");
 }
 
-/// Anonymous labels: `:`, found by `:-` and `:+`, one sign more for each
+/// Anonymous labels: `@:`, found by `@-` and `@+`, one sign more for each
 /// label further; in a REPT body, each time round has its own.
 #[test]
 fn anonymous() {
     let source = "        org 100h
 main:   mvi b, 8
-:       rlc
-        jnc :+
+@:      rlc
+        jnc @+
         inr c
-:       dcr b
-        jnz :--
-        jmp :+
+@:      dcr b
+        jnz @--
+        jmp @+
         rept 2
-:       dcr c
-        jnz :-
+@:      dcr c
+        jnz @-
         endm
-:
+@:
 .x:     ret
 ";
     let program = program("anonymous", source);
@@ -784,14 +784,25 @@ main:   mvi b, 8
     assert_eq!(program.symbols(), "main 0100\nmain.x 0116\n");
 
     // A reference stays in its label's scope, and in its file.
-    let e = error("anonymous_back", "main:\n:       nop\nother:  jmp :-\n");
-    assert_eq!(e, "p.asm:3: :-: not that many anonymous labels before it in its scope\n  other:  jmp :-");
-    let e = error("anonymous_on", "main:   jmp :++\n:       nop\nother:\n:       nop\n");
-    assert_eq!(e, "p.asm:1: :++: not that many anonymous labels after it in its scope\n  main:   jmp :++");
-    let dir = write("anonymous_file", &[("p.asm", ":       nop\n        include 'q.asm'\n"), ("q.asm", "        jmp :-\n")]);
+    let e = error("anonymous_back", "main:\n@:      nop\nother:  jmp @-\n");
+    assert_eq!(e, "p.asm:3: @-: not that many anonymous labels before it in its scope\n  other:  jmp @-");
+    let e = error("anonymous_on", "main:   jmp @++\n@:      nop\nother:\n@:      nop\n");
+    assert_eq!(e, "p.asm:1: @++: not that many anonymous labels after it in its scope\n  main:   jmp @++");
+    let dir = write("anonymous_file", &[("p.asm", "@:      nop\n        include 'q.asm'\n"), ("q.asm", "        jmp @-\n")]);
     let e = assemble(&dir.join("p.asm")).err().unwrap().to_string();
-    assert!(e.ends_with("q.asm:1: :-: not that many anonymous labels before it in its scope\n          jmp :-"), "{e}");
-    assert_eq!(error("anonymous_bare", "        jmp :\n"), "p.asm:1: expected :+ or :-\n          jmp :");
+    assert!(e.ends_with("q.asm:1: @-: not that many anonymous labels before it in its scope\n          jmp @-"), "{e}");
+    assert_eq!(error("anonymous_bare", "        jmp @\n"), "p.asm:1: expected @+ or @-\n          jmp @");
+}
+
+/// `@` alone is not a name, nor is `:`; a name may have `@` in it.
+#[test]
+fn anonymous_names() {
+    assert_eq!(error("anonymous_name", "@       nop\n"), "p.asm:1: not a name: @\n  @       nop");
+    assert_eq!(error("anonymous_colon", ":       nop\n"), "p.asm:1: not a name: :\n  :       nop");
+    let at = program("anonymous_at", "        org 100h\n@x:     dw @x, x@-1\nx@:     dw @x+1\n");
+    assert_eq!(at.image, [0x00, 0x01, 0x03, 0x01, 0x01, 0x01]);
+    let source = "m       macro x\n        dw x\n        endm\n        org 100h\nx@:     m x@-1\n";
+    assert_eq!(program("anonymous_arg", source).image, [0xFF, 0x00]);
 }
 
 /// INCLUDE and INCBIN look beside the including file, then in the include

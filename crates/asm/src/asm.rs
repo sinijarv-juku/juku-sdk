@@ -260,7 +260,7 @@ pub(crate) struct Assembler {
     files: usize,
     scopes: usize,
     /// The anonymous labels defined in this pass, in order: their file and
-    /// scope, and address. And those of the pass before, which `:+` finds.
+    /// scope, and address. And those of the pass before, which `@+` finds.
     anons: Vec<((usize, usize), i64)>,
     last_anons: Vec<((usize, usize), i64)>,
     defined: HashSet<String>,
@@ -451,7 +451,7 @@ impl Assembler {
     }
 
     /// The address of the anonymous label `n` away in this file and scope:
-    /// `:-` is -1, the last one before this line or on it; `:+` is 1, the
+    /// `@-` is -1, the last one before this line or on it; `@+` is 1, the
     /// next one after it. Before the last pass one not found is 0, and
     /// notes that the pass has one.
     pub fn anon(&mut self, n: i64) -> Result<i64> {
@@ -465,7 +465,7 @@ impl Assembler {
             Some(&(_, addr)) => Ok(addr),
             None if self.last_pass => {
                 let (sign, way) = if n < 0 { ("-", "before") } else { ("+", "after") };
-                let reference = format!(":{}", sign.repeat(n.unsigned_abs() as usize));
+                let reference = format!("@{}", sign.repeat(n.unsigned_abs() as usize));
                 Err(Error::new(format!("{reference}: not that many anonymous labels {way} it in its scope")))
             }
             None => {
@@ -802,7 +802,7 @@ impl Assembler {
     fn with_texts(&self, line: &Line) -> Option<Line> {
         let code = strip_comment(&line.raw);
         let label = match head(code.trim_end()).0 {
-            Some(label) if label != ":" => label.len(),
+            Some(label) if label != "@:" => label.len(),
             _ => 0,
         };
         let mut changed = false;
@@ -876,7 +876,7 @@ impl Assembler {
         let mut texts = Vec::new();
         for a in macros::split_top(args) {
             let bare = macros::outside_quotes(&a);
-            if bare.contains(":+") || bare.contains(":-") {
+            if has_anon_ref(&bare) {
                 return Err(Error::new("an anonymous label cannot be a macro's argument"));
             }
             texts.push(macros::map_names(&a, |n| self.resolve(n, &m.frames)));
@@ -1012,11 +1012,11 @@ impl Assembler {
         (0..=self.frames.len()).any(|depth| self.defined.contains(&self.full(name, depth)))
     }
 
-    /// Defines `label` at the current address: `:` an anonymous one.
+    /// Defines `label` at the current address: `@:` an anonymous one.
     fn define_label(&mut self, label: &str) -> Result<()> {
         check_caller(label, self.depth)?;
         self.place(self.here, 0);
-        if label == ":" {
+        if label == "@:" {
             self.anons.push(((self.file, self.scope_id), self.here));
             return Ok(());
         }
@@ -1119,7 +1119,7 @@ impl Assembler {
             return Ok(());
         }
         let n = name_len(line);
-        let anonymous = line.strip_prefix(':').filter(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace));
+        let anonymous = line.strip_prefix("@:").filter(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace));
         let (label, rest) = if let Some(rest) = anonymous {
             (None, rest.trim_start())
         } else if n > 0 && line[n..].starts_with(':') {
@@ -1175,7 +1175,7 @@ impl Assembler {
             self.switch(s);
         }
         if anonymous.is_some() {
-            self.define_label(":")?;
+            self.define_label("@:")?;
         }
         if let Some(label) = label {
             self.define_label(label)?;
@@ -1355,14 +1355,22 @@ pub(crate) fn string_bytes(text: &str) -> Result<Vec<u8>> {
 }
 
 /// The length of the name `s` starts with, 0 if none: a letter, `_`, `?`,
-/// `@` or `.`, then those or digits.
+/// `@` or `.`, then those or digits; `@` alone is an anonymous label's.
 pub(crate) fn name_len(s: &str) -> usize {
     let mut chars = s.char_indices();
     match chars.next() {
         Some((_, c)) if c.is_ascii_alphabetic() || "_?@.".contains(c) => {}
         _ => return 0,
     }
-    chars.find(|&(_, c)| !(c.is_alphanumeric() || "_?@.".contains(c))).map_or(s.len(), |(i, _)| i)
+    let n = chars.find(|&(_, c)| !(c.is_alphanumeric() || "_?@.".contains(c))).map_or(s.len(), |(i, _)| i);
+    if &s[..n] == "@" { 0 } else { n }
+}
+
+/// `text` refers to an anonymous label: `@-` or `@+` not in a name.
+fn has_anon_ref(text: &str) -> bool {
+    text.match_indices('@').any(|(i, _)| {
+        text[i + 1..].starts_with(['-', '+']) && !text[..i].ends_with(|c: char| c.is_alphanumeric() || "_?@.".contains(c))
+    })
 }
 
 /// `[label:] REPT count`: the label and the count.
@@ -1454,12 +1462,12 @@ fn opens(text: &str) -> Option<&'static str> {
     head(text).1.eq_ignore_ascii_case("MACRO").then_some("MACRO")
 }
 
-/// A line's label (`:` for an anonymous one), the word after it and the
+/// A line's label (`@:` for an anonymous one), the word after it and the
 /// rest.
 fn head(line: &str) -> (Option<&str>, &str, &str) {
     let n = name_len(line);
-    let (label, rest) = if line.strip_prefix(':').is_some_and(|r| r.is_empty() || r.starts_with(char::is_whitespace)) {
-        (Some(":"), line[1..].trim_start())
+    let (label, rest) = if line.strip_prefix("@:").is_some_and(|r| r.is_empty() || r.starts_with(char::is_whitespace)) {
+        (Some("@:"), line[2..].trim_start())
     } else if n > 0 && line[n..].starts_with(':') {
         (Some(&line[..n]), line[n + 1..].trim_start())
     } else if !line.is_empty() && !line.starts_with(char::is_whitespace) {

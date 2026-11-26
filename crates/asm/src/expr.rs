@@ -7,7 +7,7 @@ enum Token<'a> {
     Num(i64),
     /// Qualified: a local label has its scope.
     Name(String),
-    /// An anonymous label: -1 for `:-`, 2 for `:++`.
+    /// An anonymous label: -1 for `@-`, 2 for `@++`.
     Anon(i64),
     Op(&'a str),
 }
@@ -57,8 +57,8 @@ fn tokens<'a>(text: &'a str, asm: &Assembler) -> Result<Vec<Token<'a>>> {
         {
             // A full name, as a macro's argument: `^name`.
             (Token::Name(format!("{CALLERS}{}", &rest[..n])), 1 + n)
-        } else if let Some(rest) = s.strip_prefix(':') {
-            let sign = rest.chars().next().filter(|c| *c == '+' || *c == '-').ok_or_else(|| Error::new("expected :+ or :-"))?;
+        } else if let Some(rest) = s.strip_prefix('@') {
+            let sign = rest.chars().next().filter(|c| *c == '+' || *c == '-').ok_or_else(|| Error::new("expected @+ or @-"))?;
             let n = rest.chars().take_while(|&c| c == sign).count();
             (Token::Anon(if sign == '-' { -(n as i64) } else { n as i64 }), 1 + n)
         } else if c == '$' {
