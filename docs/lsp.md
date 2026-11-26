@@ -104,8 +104,8 @@ are not names here.
   renamed, nor a struct's fields, which each label laid out with the struct
   has too.
 - **Folding**: `if` to `endif` (each branch on its own), `macro`, `rept` and
-  `for` to `endm`, `struct` and `union` to `ends`, and runs of comment
-  lines.
+  `for` to `endm`, `struct` and `union` to `ends`, `samepage` to
+  `endsamepage`, and runs of comment lines.
 - **Addresses and cycles**, with the setting `inlayHints`: after each line
   that places bytes, their address, and the cycles of its instructions or
   else how many bytes. A macro's call has its expansion's; a line in a

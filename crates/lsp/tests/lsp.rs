@@ -426,6 +426,9 @@ x       db 0
 ; one
 ; two
 data:   db 1, 2, 3
+        samepage
+list:   db 4, 5
+        endsamepage
 ";
 
 fn edit_workspace(test: &str, options: &str) -> (PathBuf, Server, String) {
@@ -558,7 +561,10 @@ fn folding() {
         result.as_array().iter().map(|r| (r["startLine"].as_i64().unwrap(), r["endLine"].as_i64().unwrap(), r["kind"].as_str().unwrap().to_string())).collect();
     ranges.sort();
     let r = |s, e, k: &str| (s, e, k.to_string());
-    assert_eq!(ranges, [r(2, 3, "region"), r(13, 14, "region"), r(15, 16, "region"), r(18, 19, "region"), r(21, 22, "comment")]);
+    assert_eq!(
+        ranges,
+        [r(2, 3, "region"), r(13, 14, "region"), r(15, 16, "region"), r(18, 19, "region"), r(21, 22, "comment"), r(24, 25, "region")]
+    );
 }
 
 #[test]

@@ -91,6 +91,7 @@ greeting:
   | `dw expr, ...` | words, low byte first |
   | `ds count[, fill]` | `count` bytes of 00h or `fill` |
   | `align n` | 00h up to a multiple of `n` |
+  | `samepage` ... `endsamepage` | the lines in between in one page of 256 bytes (below) |
   | `rept count` ... `endm` | the lines in between, `count` times |
   | `for name, list` ... `endm` | the lines in between for each item of the list (below) |
   | `name macro params` ... `endm` | a macro (below) |
@@ -150,6 +151,36 @@ buffer: ds 64
 - After an `include`, the includer goes on in the section it was in: a
   file can put its strings in `const` and leave the includer in `code`.
 - The listing keeps the lines in their order, each at its address.
+
+### In one page
+
+```asm
+        bss
+        samepage
+list:   ds 8                    ; walked with L alone:
+list_end: ds 1                  ; mvi h, high(list)
+        endsamepage
+```
+
+- `samepage` up to its `endsamepage` keeps the lines in between in one page
+  of 256 bytes: their addresses all have the same high byte, so code can
+  go through them by changing L alone. They stay where they are if they
+  fit before the next page; if not, `samepage` pads with 00h up to it, and
+  they start there. The padding is at most what they take, less one byte,
+  and is listed on the `samepage` line.
+- Unlike `align`, it pads only when it must, and it says what the code
+  needs: `align 32` before a table of 22 bytes keeps it in one page too,
+  but may pad 31 bytes when none are needed.
+- The lines can be anything in one section: data, reserved memory,
+  structs, code, macros and includes. Not `align`, `org` or a section's
+  name, and not another `samepage`: the lines' size must be their own,
+  the same wherever they are. A size that depends on where the lines are
+  (`ds` of an expression with `$`) is an error, and so are more than 256
+  bytes.
+- Neither line takes a label: a label on `samepage` would be the address
+  before the padding. Put it on the line after it.
+- To start the lines at an alignment as well, put `align` before
+  `samepage`.
 
 ## Structs
 

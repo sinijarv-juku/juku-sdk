@@ -77,7 +77,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.directive.juku-asm",
-                    "match": "(?i)\\b(?:ORG|EQU|SET|DB|DW|DS|ALIGN|REPT|FOR|MACRO|ENDM|IF|ELSEIF|ELSE|ENDIF|INCLUDE|INCBIN|ASSERT|CODE|CONST|DATA|BSS|OPT|STRUCT|UNION|ENDS)\\b"
+                    "match": "(?i)\\b(?:ORG|EQU|SET|DB|DW|DS|ALIGN|REPT|FOR|MACRO|ENDM|IF|ELSEIF|ELSE|ENDIF|INCLUDE|INCBIN|ASSERT|CODE|CONST|DATA|BSS|OPT|STRUCT|UNION|ENDS|SAMEPAGE|ENDSAMEPAGE)\\b"
                 },
                 {
                     "comment": "INCLUDE 'file' AS name: AS after the file name only.",

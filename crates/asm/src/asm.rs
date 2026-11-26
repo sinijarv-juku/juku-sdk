@@ -324,6 +324,19 @@ pub(crate) struct Assembler {
     /// the outermost call's. And as written: in an expansion, the macro's.
     shown_at: Option<(Rc<str>, usize)>,
     written_at: Option<(Rc<str>, usize)>,
+    /// The SAMEPAGE block open, and the size of each one ended so far in
+    /// this pass, in order, and in the pass before: where a block starts
+    /// depends on its size.
+    same: Option<SamePage>,
+    same_sizes: Vec<i64>,
+    last_same_sizes: Vec<i64>,
+}
+
+/// An open SAMEPAGE block: where it starts, past its padding, and its
+/// line.
+struct SamePage {
+    start: i64,
+    line: Line,
 }
 
 impl Assembler {
@@ -338,6 +351,9 @@ impl Assembler {
             pass_done: false,
             shown_at: None,
             written_at: None,
+            same: None,
+            same_sizes: Vec::new(),
+            last_same_sizes: Vec::new(),
             symbols: BTreeMap::new(),
             kinds: HashMap::new(),
             last_pass: false,
@@ -562,7 +578,15 @@ impl Assembler {
         self.texts.clear();
         self.structs_defined.clear();
         self.sizes.clear();
+        self.same = None;
+        self.last_same_sizes = std::mem::take(&mut self.same_sizes);
         self.source(self.path.clone())?;
+        if let Some(open) = self.same.take() {
+            if self.last_pass {
+                return Err(Error::new("SAMEPAGE without ENDSAMEPAGE").at(&open.line));
+            }
+            self.unresolved = true;
+        }
         self.place_strings()?;
         self.last_bounds = Some(self.bounds());
         // A name this pass did not define is gone: the next pass does not
@@ -1111,6 +1135,16 @@ impl Assembler {
         let operands = operands.trim();
         let ops = split_operands(operands);
 
+        if mnemonic == "SAMEPAGE" || mnemonic == "ENDSAMEPAGE" {
+            if label.is_some() || anonymous.is_some() {
+                return Err(Error::new(format!("{mnemonic} takes no label: put it on the line after SAMEPAGE")));
+            }
+            if !operands.is_empty() {
+                return Err(Error::new(format!("{mnemonic} takes no operands")));
+            }
+            return if mnemonic == "SAMEPAGE" { self.same_page(raw) } else { self.end_same_page(raw) };
+        }
+
         if mnemonic == "EQU" || mnemonic == "SET" {
             let label = label.ok_or_else(|| Error::new(format!("{mnemonic} needs a name")))?;
             check_caller(label, self.depth)?;
@@ -1134,6 +1168,9 @@ impl Assembler {
         if let Some(s) = section {
             if !operands.is_empty() {
                 return Err(Error::new(format!("{mnemonic} takes no operands")));
+            }
+            if self.same.is_some() {
+                return Err(Error::new(format!("{mnemonic} inside SAMEPAGE: the block is in one section")));
             }
             self.switch(s);
         }
@@ -1166,6 +1203,9 @@ impl Assembler {
                     _ => return Err(Error::new("OPT takes ON or OFF")),
                 };
                 self.note(raw);
+            }
+            "ORG" | "ALIGN" if self.same.is_some() => {
+                return Err(Error::new(format!("{mnemonic} inside SAMEPAGE: the block's size must not depend on where it is")));
             }
             "ORG" => {
                 self.here = self.ev(operands)? & 0xFFFF;
@@ -1243,6 +1283,46 @@ impl Assembler {
                 return self.emit(data, raw, Some(cycles));
             }
         }
+        Ok(())
+    }
+
+    /// SAMEPAGE: the lines up to its ENDSAMEPAGE are to be in one page.
+    /// Pads to the next page if they would reach past this one.
+    fn same_page(&mut self, raw: &str) -> Result<()> {
+        if self.same.is_some() {
+            return Err(Error::new("SAMEPAGE inside SAMEPAGE"));
+        }
+        let size = match self.last_same_sizes.get(self.same_sizes.len()) {
+            Some(&size) => size,
+            None => {
+                self.unresolved = true;
+                0
+            }
+        };
+        let offset = self.here & 0xFF;
+        let pad = if size <= 0x100 && offset + size > 0x100 { 0x100 - offset } else { 0 };
+        self.emit(vec![0; pad as usize], raw, None)?;
+        let (path, number) = self.written_at.clone().unwrap_or_else(|| (self.path.clone(), 0));
+        self.same = Some(SamePage { start: self.here, line: Line { path, number, raw: raw.to_string() } });
+        Ok(())
+    }
+
+    /// ENDSAMEPAGE: the end of the SAMEPAGE block, which is to be in one
+    /// page.
+    fn end_same_page(&mut self, raw: &str) -> Result<()> {
+        let open = self.same.take().ok_or_else(|| Error::new("ENDSAMEPAGE without SAMEPAGE"))?;
+        let size = self.here - open.start;
+        if size > 0x100 {
+            return Err(Error::new(format!("SAMEPAGE: {size} bytes, more than the 256 of a page")));
+        }
+        if self.last_same_sizes.get(self.same_sizes.len()) != Some(&size) {
+            if self.last_pass {
+                return Err(Error::new("SAMEPAGE: its size depends on where it is"));
+            }
+            self.unresolved = true;
+        }
+        self.same_sizes.push(size);
+        self.mark(self.here, raw);
         Ok(())
     }
 
@@ -1358,9 +1438,9 @@ fn unquote(text: &str) -> Result<&str> {
 }
 
 /// The directives, which a macro cannot be named.
-const DIRECTIVES: [&str; 26] = [
+const DIRECTIVES: [&str; 28] = [
     "ORG", "EQU", "DB", "DW", "DS", "ALIGN", "REPT", "FOR", "MACRO", "ENDM", "IF", "ELSEIF", "ELSE", "ENDIF", "INCLUDE", "INCBIN",
-    "ASSERT", "CODE", "CONST", "DATA", "BSS", "OPT", "SET", "STRUCT", "UNION", "ENDS",
+    "ASSERT", "CODE", "CONST", "DATA", "BSS", "OPT", "SET", "STRUCT", "UNION", "ENDS", "SAMEPAGE", "ENDSAMEPAGE",
 ];
 
 /// The REPT, FOR or MACRO that line `text` opens, if it opens one.

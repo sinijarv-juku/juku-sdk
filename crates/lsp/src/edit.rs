@@ -18,9 +18,9 @@ use crate::uri;
 pub const REQUEST_FAILED: i64 = -32803;
 
 /// The directives, as source writes them.
-const DIRECTIVES: [&str; 26] = [
+const DIRECTIVES: [&str; 28] = [
     "org", "equ", "set", "db", "dw", "ds", "align", "rept", "for", "macro", "endm", "if", "elseif", "else", "endif", "include", "incbin",
-    "assert", "code", "const", "data", "bss", "opt", "struct", "union", "ends",
+    "assert", "code", "const", "data", "bss", "opt", "struct", "union", "ends", "samepage", "endsamepage",
 ];
 /// The functions an operand can call.
 const FUNCTIONS: [&str; 16] =
@@ -436,7 +436,8 @@ impl Query<'_> {
     }
 
     /// `textDocument/foldingRange`: IF to ENDIF (each branch), MACRO, REPT
-    /// and FOR to ENDM, STRUCT and UNION to ENDS, and runs of comment lines.
+    /// and FOR to ENDM, STRUCT and UNION to ENDS, SAMEPAGE to ENDSAMEPAGE,
+    /// and runs of comment lines.
     pub fn folding_ranges(&mut self, params: &Value) -> Value {
         let Some(path) = params["textDocument"]["uri"].as_str().and_then(uri::to_path) else { return Value::Null };
         let source = self.project.text(&path).unwrap_or_default();
@@ -486,6 +487,12 @@ impl Query<'_> {
                 "MACRO" | "REPT" | "FOR" => open.push((n, "ENDM")),
                 "ENDM" => {
                     if let Some(s) = closes(&mut open, "ENDM") {
+                        fold(s, n - 1, "region");
+                    }
+                }
+                "SAMEPAGE" => open.push((n, "ENDSAMEPAGE")),
+                "ENDSAMEPAGE" => {
+                    if let Some(s) = closes(&mut open, "ENDSAMEPAGE") {
                         fold(s, n - 1, "region");
                     }
                 }

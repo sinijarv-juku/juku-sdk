@@ -1037,3 +1037,78 @@ buf     ds 4
     let placed: Vec<_> = index.placed.iter().map(|p| (p.line, p.address, p.size, p.cycles)).collect();
     assert_eq!(placed, [(6, 0x100, 3, Some(11)), (8, 0x103, 3, Some(15)), (10, 0x106, 2, None), (12, 0x108, 4, None)]);
 }
+
+/// SAMEPAGE ... ENDSAMEPAGE: the lines between are in one page, padded to
+/// the next one only if they would reach past theirs; in BSS too, and in
+/// code, where the padding is 00h. The size is the lines' own, whatever
+/// is above or below.
+#[test]
+fn same_page() {
+    let p = program(
+        "same_page",
+        "        org 1f0h
+        db 1, 2, 3
+        samepage
+fits:   ds 4, 0ffh
+        endsamepage
+        samepage
+moved:  db 9
+        ds 15, 0eeh
+after:  db 8
+        endsamepage
+        nop
+        bss
+        org 3fch
+        samepage
+list:   ds NOBJ
+list_end: ds 1
+        endsamepage
+small:  ds 2
+NOBJ    equ 8
+",
+    );
+    assert_eq!(p.symbols(), "NOBJ 0008\nafter 0210\nfits 01F3\nlist 0400\nlist_end 0408\nmoved 0200\nsmall 0409\n");
+    let mut want = vec![1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF];
+    want.extend([0; 9]); // padding up to 0200h
+    want.push(9);
+    want.extend([0xEE; 15]);
+    want.extend([8, 0]);
+    assert_eq!((p.load, &p.image[..]), (0x1F0, &want[..]));
+    let listing = p.listing();
+    assert!(listing.contains("01F7  00 00 00 00"), "the padding is listed on SAMEPAGE:\n{listing}");
+}
+
+#[test]
+fn same_page_errors() {
+    let e = |name: &str, body: &str| error(name, &format!("        org 100h\n{body}"));
+    assert_eq!(e("same_open", "        samepage\n        nop\n"), "p.asm:2: SAMEPAGE without ENDSAMEPAGE\n          samepage");
+    assert_eq!(e("same_end", "        nop\n        endsamepage\n"), "p.asm:3: ENDSAMEPAGE without SAMEPAGE\n          endsamepage");
+    assert_eq!(
+        e("same_nested", "        samepage\n        samepage\n        endsamepage\n        endsamepage\n"),
+        "p.asm:3: SAMEPAGE inside SAMEPAGE\n          samepage"
+    );
+    assert_eq!(
+        e("same_big", "        samepage\n        ds 257\n        endsamepage\n"),
+        "p.asm:4: SAMEPAGE: 257 bytes, more than the 256 of a page\n          endsamepage"
+    );
+    assert_eq!(
+        e("same_align", "        samepage\n        align 4\n        endsamepage\n"),
+        "p.asm:3: ALIGN inside SAMEPAGE: the block's size must not depend on where it is\n          align 4"
+    );
+    assert_eq!(
+        e("same_org", "        samepage\n        org 200h\n        endsamepage\n"),
+        "p.asm:3: ORG inside SAMEPAGE: the block's size must not depend on where it is\n          org 200h"
+    );
+    assert_eq!(
+        e("same_section", "        samepage\n        bss\n        endsamepage\n"),
+        "p.asm:3: BSS inside SAMEPAGE: the block is in one section\n          bss"
+    );
+    assert_eq!(
+        e("same_label", "here:   samepage\n        nop\n        endsamepage\n"),
+        "p.asm:2: SAMEPAGE takes no label: put it on the line after SAMEPAGE\n  here:   samepage"
+    );
+    assert_eq!(
+        e("same_moving", "        ds 0f0h\n        samepage\n        ds 4 + 16 * (low($) != 0)\n        endsamepage\n"),
+        "p.asm:5: SAMEPAGE: its size depends on where it is\n          endsamepage"
+    );
+}
