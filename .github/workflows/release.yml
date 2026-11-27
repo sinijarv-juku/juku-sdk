@@ -1,7 +1,8 @@
-# A tag vX.Y.Z makes a draft release with the commands for macOS, Linux and
-# Windows and the VS Code extension (README.md, "Versions"), published by
-# hand after a look. Run by hand for a tag pushed before this workflow
-# existed.
+# A tag vX.Y.Z makes a draft release with the commands for macOS (Apple
+# silicon and Intel), Linux and Windows and the VS Code extension
+# (README.md, "Versions"), published by hand after a look. The Intel
+# commands are built on the Apple silicon runner (build.sh x86_64). Run by
+# hand for a tag pushed before this workflow existed.
 name: Release
 
 on:
@@ -25,6 +26,7 @@ jobs:
       matrix:
         include:
           - { os: macos-26, platform: macos-arm64 }
+          - { os: macos-26, platform: macos-x64, arch: x86_64 }
           - { os: ubuntu-latest, platform: linux-x64 }
           - { os: windows-2025, platform: windows-x64 }
     runs-on: ${{ matrix.os }}
@@ -42,8 +44,15 @@ jobs:
       - name: Rust, as rust-toolchain.toml names it
         run: rustup toolchain install
       - name: Build
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && !matrix.arch
         run: ./build.sh
+      - name: Build for ${{ matrix.arch }}
+        if: matrix.arch
+        run: |
+          ./build.sh ${{ matrix.arch }}
+          for f in target/bin-${{ matrix.arch }}/*; do test "$(lipo -archs $f)" = ${{ matrix.arch }}; done
+          rm -rf target/bin
+          mv target/bin-${{ matrix.arch }} target/bin
       - name: Build
         if: runner.os == 'Windows'
         shell: cmd

@@ -1,6 +1,8 @@
 # Tests and builds the commands on macOS, Linux and Windows on every push to
 # main and every pull request, except one that changes only documentation,
-# and packs the VS Code extension.
+# and packs the VS Code extension. On macOS the commands are built for Intel
+# Macs too, and the tests run for Intel under Rosetta 2 when the runner has
+# it.
 name: CI
 
 on:
@@ -38,6 +40,21 @@ jobs:
       - name: Build
         if: runner.os != 'Windows'
         run: ./build.sh && target/bin/juku-asm --version
+      - name: Build for Intel
+        if: runner.os == 'macOS'
+        run: |
+          ./build.sh x86_64
+          for f in target/bin-x86_64/*; do test "$(lipo -archs $f)" = x86_64; done
+      - name: Tests for Intel
+        if: runner.os == 'macOS'
+        run: |
+          if arch -x86_64 /usr/bin/true 2>/dev/null; then
+            rustup target add x86_64-apple-darwin
+            cargo test --locked --target x86_64-apple-darwin
+            target/bin-x86_64/juku-asm --version
+          else
+            echo "::notice::This runner has no Rosetta 2: the Intel tests did not run"
+          fi
       - name: Build
         if: runner.os == 'Windows'
         shell: cmd

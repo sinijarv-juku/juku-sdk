@@ -64,6 +64,7 @@ are welcome. No ROM code is included, only names and numbers.
 ./build.sh                    # every command -> target/bin/
 ./build.sh install            # every command into cargo's bin folder, on the PATH
 ./build.sh debug              # unoptimized, with debug info
+./build.sh x86_64             # on a Mac: for Intel Macs -> target/bin-x86_64/ (arm64 for Apple silicon)
 cargo test                    # the tests, of every crate
 python3 vscode/package.py     # the VS Code extension -> target/juku.vsix
 code --install-extension target/juku.vsix
@@ -112,8 +113,8 @@ its layout may change in any release.
 A release is the commit that drops `-dev` from the version, `build: bump the
 version to X.Y.Z`, tagged `vX.Y.Z`; the next commit starts the next one,
 `build: start version X.Y+1.0-dev`. Pushing the tag drafts the GitHub
-release: the commands for macOS, Linux and Windows with the include files
-and the demos, and the VS Code extension (`.github/workflows/release.yml`),
+release: the commands for macOS (Apple silicon and Intel), Linux and
+Windows with the include files and the demos, and the VS Code extension (`.github/workflows/release.yml`),
 with places for the changes since the previous release, which are written
 in before it is published by hand. Every push to `main` and every pull request is tested
 and built on the three systems (`.github/workflows/ci.yml`), except one
