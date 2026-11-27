@@ -1,6 +1,6 @@
 //! The command: a session over stdin and stdout.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 
 use juku_json::Value;
@@ -13,6 +13,20 @@ fn version() {
     let out = Command::new(LSP).arg("--version").output().unwrap();
     assert_eq!(String::from_utf8(out.stdout).unwrap(), format!("juku-lsp {}\n", env!("CARGO_PKG_VERSION")));
     assert!(!Command::new(LSP).arg("--nonsense").output().unwrap().status.success());
+}
+
+/// The next message the server writes, read from `stdout` into `bytes`
+/// as far as needed.
+fn next_message(stdout: &mut impl Read, bytes: &mut Vec<u8>) -> Value {
+    loop {
+        if let Some(body) = take_message(bytes, 1 << 20).unwrap() {
+            return Value::parse(&body).unwrap();
+        }
+        let mut chunk = [0; 4096];
+        let n = stdout.read(&mut chunk).unwrap();
+        assert!(n > 0, "the server stopped writing");
+        bytes.extend_from_slice(&chunk[..n]);
+    }
 }
 
 /// A session: errors come once the client has been quiet, and the exit
@@ -38,18 +52,21 @@ fn session() {
     }
     stdin.write_all(&input).unwrap();
     stdin.flush().unwrap();
-    // Quiet for longer than the server waits.
+    // Quiet for longer than the server waits, from when it answers: a
+    // server slow to start, as under Rosetta 2, would read all the
+    // messages at once otherwise, and see no quiet before the shutdown.
+    let mut stdout = child.stdout.take().unwrap();
+    let mut bytes = Vec::new();
+    let mut got = vec![next_message(&mut stdout, &mut bytes)];
     std::thread::sleep(std::time::Duration::from_millis(600));
     let mut input = Vec::new();
     write_message(&mut input, r#"{"jsonrpc":"2.0","id":2,"method":"shutdown"}"#);
     write_message(&mut input, r#"{"jsonrpc":"2.0","method":"exit"}"#);
     stdin.write_all(&input).unwrap();
     drop(stdin);
-    let out = child.wait_with_output().unwrap();
-    assert_eq!(out.status.code(), Some(0));
+    stdout.read_to_end(&mut bytes).unwrap();
+    assert_eq!(child.wait().unwrap().code(), Some(0));
 
-    let mut bytes = out.stdout;
-    let mut got = Vec::new();
     while let Some(body) = take_message(&mut bytes, 1 << 20).unwrap() {
         got.push(Value::parse(&body).unwrap());
     }
